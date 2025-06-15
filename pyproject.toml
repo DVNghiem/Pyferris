@@ -1,0 +1,24 @@
+[project]
+name = "pyferris"
+version = "0.1.0"
+description = "PyFerris is a high-performance parallel processing library for Python, powered by Rust and PyO3"
+license = {text = "MIT License"}
+authors = [
+    {name = "Dang Van Nghiem",email = "vannghiem848@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+module-name = 'pyferris._pyferris'
+bindings = 'pyo3'
+

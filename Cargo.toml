@@ -1,0 +1,38 @@
+[package]
+name = "Pyferris"
+version = "0.3.2"
+edition = "2024"
+description = "PyFerris is a high-performance parallel processing library for Python, powered by Rust and PyO3"
+authors = ["Dang Van Nghiem <martin@smartsolution.id.vn>"]
+license = "BSD-3-Clause"
+readme = "README.md"
+
+[lib]
+name = "_pyferris"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "=0.25", features = ["extension-module", "generate-import-lib", "experimental-async"] }
+pyo3-async-runtimes = { version = "0.25", features = ["tokio-runtime"] }
+tokio = { version = "1.0", features = ["full"] }
+mimalloc = { version = "0.1", optional = true }
+crossbeam-channel = "0.5"
+rayon = "1.10.0"
+
+[target.'cfg(not(any(target_env = "musl", target_os = "freebsd", target_os = "openbsd", target_os = "windows")))'.dependencies]
+tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["disable_initial_exec_tls"] }
+
+[build-dependencies]
+pyo3-build-config = "=0.25"
+
+[features]
+mimalloc = ["dep:mimalloc"]
+
+[profile.release]
+codegen-units = 1
+debug = false
+incremental = false
+lto = "fat"
+opt-level = 3
+panic = "abort"
+strip = "debuginfo"
