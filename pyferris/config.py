@@ -64,7 +64,7 @@ def get_chunk_size():
     """
     return _get_chunk_size()
 
-class Config(_Config):
+class Config:
     """
     Configuration class for managing global PyFerris settings.
     
@@ -83,7 +83,38 @@ class Config(_Config):
             chunk_size: Default chunk size
             error_strategy: Error handling strategy ('raise', 'ignore', 'collect')
         """
-        super().__init__(worker_count, chunk_size, error_strategy)
+        self._config = _Config(worker_count, chunk_size, error_strategy)
+    
+    @property
+    def worker_count(self):
+        return self._config.worker_count
+    
+    @worker_count.setter
+    def worker_count(self, value):
+        self._config.worker_count = value
+    
+    @property
+    def chunk_size(self):
+        return self._config.chunk_size
+    
+    @chunk_size.setter
+    def chunk_size(self, value):
+        self._config.chunk_size = value
+    
+    @property
+    def error_strategy(self):
+        return self._config.error_strategy
+    
+    @error_strategy.setter
+    def error_strategy(self, value):
+        self._config.error_strategy = value
+    
+    def apply(self):
+        """Apply the configuration globally."""
+        return self._config.apply()
+    
+    def __repr__(self):
+        return repr(self._config)
 
 __all__ = [
     "set_worker_count",

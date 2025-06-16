@@ -1,8 +1,30 @@
 use pyo3::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Once;
 
 static WORKER_COUNT: AtomicUsize = AtomicUsize::new(0);
 static CHUNK_SIZE: AtomicUsize = AtomicUsize::new(1000);
+static INIT: Once = Once::new();
+
+/// Initialize the global thread pool (called only once)
+fn init_thread_pool() {
+    INIT.call_once(|| {
+        let worker_count = WORKER_COUNT.load(Ordering::SeqCst);
+        let count = if worker_count == 0 {
+            rayon::current_num_threads()
+        } else {
+            worker_count
+        };
+        
+        if let Err(e) = rayon::ThreadPoolBuilder::new()
+            .num_threads(count)
+            .thread_name(|i| format!("pyferris-{}", i))
+            .build_global()
+        {
+            eprintln!("Warning: Failed to initialize custom thread pool: {}. Using default rayon pool.", e);
+        }
+    });
+}
 
 /// Set the number of worker threads for parallel operations
 #[pyfunction]
@@ -15,11 +37,8 @@ pub fn set_worker_count(count: usize) -> PyResult<()> {
     
     WORKER_COUNT.store(count, Ordering::SeqCst);
     
-    // Configure rayon thread pool
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(count)
-        .build_global()
-        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to set worker count: {}", e)))?;
+    // Initialize thread pool if not already done
+    init_thread_pool();
     
     Ok(())
 }
