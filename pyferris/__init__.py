@@ -28,6 +28,7 @@ from ._pyferris import (
 from .core import *
 from .executor import *
 from .config import *
+from .simple_io import *
 
 __version__ = "0.1.0"
 __all__ = [
