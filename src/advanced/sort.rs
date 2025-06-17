@@ -33,8 +33,8 @@ pub fn parallel_sort(
             }).collect::<PyResult<Vec<_>>>()
         })?;
         
-        // Sort by key
-        keyed_items.par_sort_by(|a, b| {
+        // Sort by key - use sequential sort to avoid GIL issues in parallel context
+        keyed_items.sort_by(|a, b| {
             Python::with_gil(|py| {
                 let cmp_result = a.0.bind(py).compare(&b.0.bind(py));
                 match cmp_result {
@@ -53,8 +53,8 @@ pub fn parallel_sort(
         // Extract sorted values
         items = keyed_items.into_iter().map(|(_, value)| value).collect();
     } else {
-        // Direct comparison sort
-        items.par_sort_by(|a, b| {
+        // Direct comparison sort - use sequential sort to avoid GIL issues
+        items.sort_by(|a, b| {
             Python::with_gil(|py| {
                 let cmp_result = a.bind(py).compare(&b.bind(py));
                 match cmp_result {

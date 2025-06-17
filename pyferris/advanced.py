@@ -3,6 +3,16 @@ Advanced parallel operations for PyFerris Level 2.
 
 This module provides intermediate-level parallel processing capabilities
 including advanced operations, batch processing, and result collection.
+
+Note on Performance:
+    These parallel operations are optimized for specific use cases:
+    - Large datasets (>10,000 items) where parallel processing overhead is justified
+    - CPU-intensive key functions or comparisons
+    - I/O-bound operations within processing functions
+    
+    For small datasets, sequential operations may be faster due to parallel overhead.
+    The parallel operations excel when used with complex key functions or when
+    processing large amounts of data.
 """
 
 from ._pyferris import (
