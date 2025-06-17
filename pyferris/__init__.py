@@ -7,6 +7,10 @@ from .core import parallel_map, parallel_reduce, parallel_filter, parallel_starm
 from .config import Config, get_chunk_size, get_worker_count, set_chunk_size, set_worker_count
 from .executor import Executor
 from .io import csv, file_reader, simple_io, file_writer, json, parallel_io
+from .advanced import (
+    parallel_sort, parallel_group_by, parallel_unique, parallel_partition,
+    parallel_chunks, BatchProcessor, ProgressTracker, ResultCollector
+)
 
 __all__ = [
     # core base functionality
@@ -32,5 +36,15 @@ __all__ = [
     "simple_io",
     "file_writer",
     "json",
-    "parallel_io"
+    "parallel_io",
+    
+    # Level 2: Advanced parallel operations
+    "parallel_sort",
+    "parallel_group_by", 
+    "parallel_unique",
+    "parallel_partition",
+    "parallel_chunks",
+    "BatchProcessor",
+    "ProgressTracker", 
+    "ResultCollector"
 ]
