@@ -110,10 +110,40 @@ More examples are available in the `examples/` directory, covering all features 
 
 ## Documentation
 
-Full documentation is available at [https://yourusername.github.io/pyferris](https://yourusername.github.io/pyferris). It includes:
-- API reference for all functions and classes.
-- Guides for getting started, advanced usage, and enterprise features.
-- Examples for data science, machine learning, IoT, and distributed computing.
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[Core Features](docs/core.md)** - Parallel operations (`parallel_map`, `parallel_filter`, `parallel_reduce`, `parallel_starmap`)
+- **[Executor](docs/executor.md)** - Task execution and thread pool management
+- **[I/O Operations](docs/io.md)** - File I/O and parallel data processing (CSV, JSON, text files)
+- **[Examples](docs/examples.md)** - Practical usage examples and real-world use cases
+- **[API Reference](docs/api_reference.md)** - Complete API documentation
+
+### Quick Start Guide
+
+```python
+# Core parallel operations
+from pyferris import parallel_map, parallel_filter, parallel_reduce
+
+# Process data in parallel
+results = parallel_map(lambda x: x**2, range(1000))
+evens = parallel_filter(lambda x: x % 2 == 0, range(1000))
+total = parallel_reduce(lambda x, y: x + y, range(1000))
+
+# Task execution
+from pyferris import Executor
+
+with Executor(max_workers=4) as executor:
+    future = executor.submit(expensive_function, data)
+    result = future.result()
+
+# File I/O operations
+from pyferris.io import simple_io, csv, json
+
+# Read/write files in parallel
+contents = simple_io.read_files_parallel(['file1.txt', 'file2.txt'])
+data = csv.read_csv('large_dataset.csv')
+json.write_json('output.json', processed_data)
+```
 
 ## Performance
 
@@ -143,4 +173,4 @@ PyFerris is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-*PyFerris: Unleash the power of Rust in Python for parallel processing!*# PyFerris
+*PyFerris: Unleash the power of Rust in Python for parallel processing!*

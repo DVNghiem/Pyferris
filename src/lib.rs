@@ -53,20 +53,7 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(log_error, m)?)?;
     
     // Register simple IO functions
-    m.add_class::<SimpleFileReader>()?;
-    m.add_class::<SimpleFileWriter>()?;
-    
-    // Basic file operations
-    m.add_function(wrap_pyfunction!(simple_read_file, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_write_file, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_parallel_read_files, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_parallel_write_files, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_file_exists, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_get_file_size, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_create_directory, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_delete_file, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_copy_file, m)?)?;
-    m.add_function(wrap_pyfunction!(simple_move_file, m)?)?;
+    register_io(py, m)?;
     
     // Register custom exception
     m.add("ParallelExecutionError", py.get_type::<ParallelExecutionError>())?;

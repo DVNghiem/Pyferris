@@ -2,8 +2,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyList, PyTuple};
 use rayon::prelude::*;
 
-use pyo3::prelude::*;
-use rayon::prelude::*;
 use std::sync::Arc;
 
 /// Parallel map implementation
