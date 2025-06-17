@@ -1,53 +1,201 @@
-# Pyferris IO Module Tests
+# Pyferris Comprehensive Test Suite
 
-This directory contains comprehensive unit tests for the Pyferris IO module, covering all implemented features including simple file operations, parallel processing, and object-oriented interfaces.
+This directory contains comprehensive unit tests for all Pyferris features, covering core parallel operations, I/O functionality, configuration management, and more.
 
 ## Test Structure
 
 ### Test Files
 
-- **`test_simple_io.py`** - Main test suite with comprehensive coverage
+- **`test_all.py`** - Comprehensive test runner for all modules
+- **`test_core.py`** - Tests for core parallel operations (map, filter, reduce, starmap)
+- **`test_config.py`** - Tests for configuration management (worker count, chunk size)
+- **`test_simple_io.py`** - Tests for simple I/O operations
+- **`test_csv.py`** - Tests for CSV reading and writing operations
+- **`test_json.py`** - Tests for JSON reading and writing operations
+- **`test_executor.py`** - Tests for Executor functionality
+- **`test_parallel_io.py`** - Tests for parallel I/O operations
 
 ### Test Categories
 
-The test suite is organized into the following test classes:
+The test suite covers the following components:
 
-1. **`TestSimpleFileOperations`** - Basic file I/O operations
-2. **`TestParallelFileOperations`** - Parallel processing features  
-3. **`TestSimpleFileReader`** - Object-oriented reader interface
-4. **`TestSimpleFileWriter`** - Object-oriented writer interface
-5. **`TestErrorHandling`** - Error conditions and edge cases
-6. **`TestPerformance`** - Performance characteristics and benchmarks
+1. **Core Parallel Operations** (`test_core.py`)
+   - `parallel_map` functionality
+   - `parallel_filter` functionality
+   - `parallel_reduce` functionality
+   - `parallel_starmap` functionality
+   - Performance characteristics
+   - Edge cases and error handling
+
+2. **Configuration Management** (`test_config.py`)
+   - Worker count configuration
+   - Chunk size configuration
+   - Config class functionality
+   - Integration with parallel operations
+
+3. **Simple I/O Operations** (`test_simple_io.py`)
+   - Basic file operations
+   - Parallel file operations
+   - SimpleFileReader and SimpleFileWriter classes
+   - Error handling and performance testing
+
+4. **CSV I/O Operations** (`test_csv.py`)
+   - CsvReader and CsvWriter classes
+   - Reading/writing with headers and custom delimiters
+   - Utility functions (read_csv, write_csv, etc.)
+   - Edge cases and performance testing
+
+5. **JSON I/O Operations** (`test_json.py`)
+   - JsonReader and JsonWriter classes
+   - JSON and JSON Lines format support
+   - Utility functions (read_json, write_json, etc.)
+   - Unicode handling and performance testing
+
+6. **Executor Functionality** (`test_executor.py`)
+   - Executor class instantiation and methods
+   - Task execution capabilities
+   - Resource management
+   - Integration with other components
+
+7. **Parallel I/O Operations** (`test_parallel_io.py`)
+   - ParallelFileProcessor class
+   - Parallel utility functions
+   - File chunk processing
+   - Performance comparisons
 
 ## Running Tests
 
-### Run All Tests
+### Run All Tests (Recommended)
 
 ```bash
 cd /path/to/Pyferris
-python tests/test_simple_io.py
+python tests/test_all.py
 ```
 
-### Run Specific Test Class
+This will run all test modules and provide a comprehensive summary.
+
+### Run All Tests with Different Verbosity
 
 ```bash
-cd /path/to/Pyferris
-python -m unittest tests.test_simple_io.TestSimpleFileOperations
+# Quiet mode (minimal output)
+python tests/test_all.py --quiet
+
+# Normal verbosity
+python tests/test_all.py
+
+# High verbosity (detailed output)
+python tests/test_all.py -v
+
+# Maximum verbosity
+python tests/test_all.py -vv
 ```
 
-### Run with Verbose Output
+### Run Specific Test Module
 
 ```bash
-cd /path/to/Pyferris
-python -m unittest tests.test_simple_io -v
+# Run only core tests
+python tests/test_all.py --module core
+
+# Run only CSV tests
+python tests/test_all.py --module csv
+
+# Run only JSON tests
+python tests/test_all.py --module json
 ```
 
-### Run Individual Test
+Available modules: `core`, `config`, `simple_io`, `csv`, `json`, `executor`, `parallel_io`
+
+### Run Individual Test Files
 
 ```bash
-cd /path/to/Pyferris
-python -m unittest tests.test_simple_io.TestSimpleFileOperations.test_write_and_read_file
+# Run specific test file directly
+python tests/test_core.py
+python tests/test_csv.py
+python tests/test_json.py
+
+# Run with unittest module
+python -m unittest tests.test_core
+python -m unittest tests.test_csv
+python -m unittest tests.test_json
 ```
+
+### Run Specific Test Classes or Methods
+
+```bash
+# Run specific test class
+python -m unittest tests.test_core.TestParallelMap
+
+# Run specific test method
+python -m unittest tests.test_core.TestParallelMap.test_simple_map
+
+# Run with verbose output
+python -m unittest tests.test_csv.TestCsvReader -v
+```
+
+## Test Coverage
+
+The test suite provides comprehensive coverage of:
+
+- ✅ **Core functionality**: All parallel operations
+- ✅ **Configuration**: Worker and chunk size management
+- ✅ **I/O operations**: File, CSV, and JSON handling
+- ✅ **Parallel processing**: Concurrent file operations
+- ✅ **Error handling**: Exception cases and edge conditions
+- ✅ **Performance**: Benchmarking and optimization tests
+- ✅ **Integration**: Component interaction testing
+
+## Understanding Test Results
+
+### Test Output
+
+The comprehensive test runner provides:
+
+1. **Module-by-module results** with success rates
+2. **Overall statistics** and performance metrics
+3. **Detailed failure/error reports** with troubleshooting info
+4. **Performance analysis** and recommendations
+
+### Success Rates
+
+- **100%**: All tests passed - installation is perfect
+- **90-99%**: Minor issues - mostly functional
+- **70-89%**: Some problems - review failures
+- **<70%**: Significant issues - check installation
+
+### Common Issues and Solutions
+
+1. **Import Errors**: Ensure Pyferris is properly installed
+2. **Rust Extension Issues**: Recompile with `maturin develop`
+3. **File Permission Errors**: Check directory permissions
+4. **Performance Issues**: May indicate system resource constraints
+
+## Adding New Tests
+
+When adding new functionality to Pyferris:
+
+1. **Create test file**: Follow naming convention `test_<module>.py`
+2. **Add to test runner**: Update `test_all.py` to include new module
+3. **Follow patterns**: Use existing tests as templates
+4. **Include edge cases**: Test error conditions and boundary cases
+5. **Add performance tests**: Include benchmarking where appropriate
+
+## Test Development Guidelines
+
+- **Use descriptive names**: Test methods should clearly indicate what they test
+- **Include docstrings**: Document what each test verifies
+- **Test edge cases**: Empty inputs, large datasets, error conditions
+- **Verify correctness**: Always check that results are correct, not just that code runs
+- **Performance awareness**: Include timing information for performance-critical operations
+- **Clean up resources**: Use setUp/tearDown to manage test fixtures
+
+## Continuous Integration
+
+These tests are designed to be run in CI/CD environments:
+
+- **Exit codes**: Test runner returns appropriate exit codes
+- **Output formats**: Supports various verbosity levels
+- **Modular execution**: Can run subsets of tests
+- **Performance monitoring**: Tracks execution times
 
 ## Test Coverage
 

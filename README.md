@@ -1,10 +1,10 @@
 # PyFerris
 
-**PyFerris** is a high-performance parallel processing library for Python, powered by Rust and PyO3. It provides a seamless, Pythonic API to leverage Rust's speed and memory safety for parallel and distributed computing, bypassing Python's Global Interpreter Lock (GIL). PyFerris is designed for data scientists, machine learning engineers, and developers who need efficient parallel processing for CPU-bound tasks, big data, machine learning pipelines, IoT streaming, and enterprise-grade applications.
+**PyFerris** is a high-performance parallel processing library for Python, powered by Rust and PyO3. It provides a seamless, Pythonic API to leverage Rust's speed and memory safety for parallel and distributed computing, bypassing Python's Global Interpreter Lock (GIL). PyFerris is designed for developers and engineers across all fields who need efficient parallel processing for compute-intensive tasks, running anywhere from embedded systems to enterprise-grade applications.
 
 ## Key Features
 
-PyFerris offers a comprehensive set of features, from basic parallel operations to advanced distributed processing and GPU support:
+PyFerris offers a comprehensive set of features, from basic parallel operations to advanced distributed processing:
 
 ### Level 1: Basic Features
 - **Core Parallel Operations**: `parallel_map`, `parallel_filter`, `parallel_reduce`, `parallel_starmap` for efficient parallel processing.
@@ -34,20 +34,20 @@ PyFerris offers a comprehensive set of features, from basic parallel operations 
 - **Distributed Processing**: Multi-machine support with `DistributedExecutor`, `cluster_map`, and `distributed_reduce`.
 - **Fault Tolerance**: Reliable execution with `RetryExecutor` and `CheckpointManager`.
 - **Resource Management**: Fine-grained control with `ResourceManager` and `ResourceMonitor`.
-- **Framework Integrations**: Seamless integration with NumPy, Pandas, Dask, and Ray.
-- **Advanced Analytics**: Performance analysis with `PerformanceAnalyzer` and Prometheus metrics export.
+- **Framework Integrations**: Seamless integration with popular libraries and frameworks.
+- **Advanced Analytics**: Performance analysis with `PerformanceAnalyzer` and metrics export.
 - **Custom Extensions**: Plugin system with `register_custom_operation` and `load_plugin`.
 
 ### Additional Features
-- **GPU Parallel Processing**: Accelerate computations with GPU support (`gpu_parallel_map`).
-- **Tensor Parallel Operations**: Optimize ML pipelines with tensor operations compatible with PyTorch/TensorFlow.
-- **IoT Stream Processing**: Handle real-time data streams with `stream_parallel_process`.
-- **Serverless Task Offloading**: Run tasks on AWS Lambda or Google Cloud Functions with `serverless_parallel_map`.
+- **Cross-Platform Processing**: Run efficiently on any processor architecture and operating system.
+- **Scalable Operations**: From single-core embedded systems to multi-node clusters.
+- **Real-time Processing**: Handle streaming data and real-time computations.
+- **Cloud Integration**: Deploy and scale across cloud platforms and serverless environments.
 - **Interactive Mode**: Jupyter-friendly API with magic commands (`%%parallel_map`) and visual progress.
 - **Auto-Tuning API**: Automatically optimize workers and chunk sizes with `auto_tune`.
 - **Visualization Tools**: Visualize task execution and resource usage with `PerformanceVisualizer`.
-- **Data Encryption**: Secure shared memory with `SharedArray.encrypt` for sensitive data.
-- **Audit Logging**: Compliance-ready logging with `set_audit_log`.
+- **Data Security**: Secure processing with encryption and audit capabilities.
+- **Compliance Logging**: Enterprise-ready logging with `set_audit_log`.
 
 ## Installation
 
@@ -55,12 +55,6 @@ PyFerris is available on PyPI and can be installed with `pip` or `poetry`.
 
 ```bash
 pip install pyferris
-```
-
-For optional dependencies (e.g., Pandas, Dask, GPU support):
-
-```bash
-pip install pyferris[pandas,dask,gpu]
 ```
 
 To build from source (requires Rust and `maturin`):
@@ -147,7 +141,7 @@ json.write_json('output.json', processed_data)
 
 ## Performance
 
-PyFerris leverages Rust's performance and memory safety to outperform Python's built-in `multiprocessing` and `concurrent.futures` for CPU-bound tasks. For example, `parallel_map` can be 2-5x faster than `multiprocessing.Pool.map` for large datasets, thanks to Rust's zero-cost abstractions and GIL-free execution.
+PyFerris leverages Rust's performance and memory safety to outperform Python's built-in `multiprocessing` and `concurrent.futures` for compute-intensive tasks. For example, `parallel_map` can be 2-5x faster than `multiprocessing.Pool.map` for large datasets, thanks to Rust's zero-cost abstractions and GIL-free execution across all processor types and platforms.
 
 ## Contributing
 
@@ -168,9 +162,7 @@ PyFerris is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 ## Contact
 
 - **Issues**: Report bugs or request features at [GitHub Issues](https://github.com/DVNghiem/Pyferris/issues).
-- **Email**: Contact the maintainer at your.email@example.com.
-- **Community**: Join our community on [Discord/Slack] (TBD).
 
 ---
 
-*PyFerris: Unleash the power of Rust in Python for parallel processing!*
+*PyFerris: Unleash the power of Rust in Python for universal parallel processing!*
