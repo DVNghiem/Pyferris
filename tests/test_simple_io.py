@@ -9,8 +9,8 @@ import unittest
 import tempfile
 import os
 import shutil
-import pyferris.simple_io as sio
-from pyferris import SimpleFileReader, SimpleFileWriter
+import pyferris.io.simple_io as sio
+from pyferris.io.simple_io import SimpleFileReader, SimpleFileWriter
 
 
 class TestSimpleFileOperations(unittest.TestCase):

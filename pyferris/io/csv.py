@@ -4,7 +4,7 @@ Handles reading/writing CSV, JSON, and text files with parallel processing capab
 """
 
 from typing import List, Dict, Any
-from . import _pyferris
+from pyferris import _pyferris
 
 __all__ = [
     # File I/O classes

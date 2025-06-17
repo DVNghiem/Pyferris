@@ -1,58 +1,36 @@
 """
 PyFerris - High-performance parallel processing library for Python, powered by Rust and PyO3.
-
-Level 1 Features:
-- Core Parallel Operations: parallel_map, parallel_filter, parallel_reduce, parallel_starmap
-- Task Executor: Executor class for managing tasks
-- Basic Configuration: set_worker_count, set_chunk_size
-- Error Handling: ParallelExecutionError and error strategies
 """
 
-from ._pyferris import (
-    parallel_map,
-    parallel_starmap, 
-    parallel_filter,
-    parallel_reduce,
-    Executor,
-    set_worker_count,
-    get_worker_count,
-    set_chunk_size,
-    get_chunk_size,
-    Config,
-    ParallelExecutionError,
-    log_info,
-    log_warning,
-    log_error,
-)
-
-from .core import *
-from .executor import *
-from .config import *
-from .simple_io import *
-
 __version__ = "0.1.0"
+from .core import parallel_map, parallel_reduce, parallel_filter, parallel_starmap
+from .config import Config, get_chunk_size, get_worker_count, set_chunk_size, set_worker_count
+from .executor import Executor
+from .io import csv, file_reader, simple_io, file_writer, json, parallel_io
+
 __all__ = [
-    # Core parallel operations
+    # core base functionality
+    "__version__",
     "parallel_map",
-    "parallel_starmap",
-    "parallel_filter", 
     "parallel_reduce",
-    
-    # Executor
-    "Executor",
-    
-    # Configuration
-    "set_worker_count",
-    "get_worker_count",
-    "set_chunk_size", 
-    "get_chunk_size",
+    "parallel_filter",
+    "parallel_starmap",
+
+    # configuration management
     "Config",
-    
-    # Error handling
-    "ParallelExecutionError",
-    
-    # Logging
-    "log_info",
-    "log_warning",
-    "log_error",
+    "get_chunk_size",
+    "get_worker_count",
+    "set_chunk_size",
+    "set_worker_count",
+
+    # executor
+    "Executor",
+
+    # I/O operations
+    "csv",
+    "file_reader",
+    "simple_io",
+    "file_writer",
+    "json",
+    "parallel_io"
 ]

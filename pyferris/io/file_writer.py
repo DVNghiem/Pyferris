@@ -5,7 +5,7 @@ This module provides efficient file Writing operations with buffering and parall
 """
 
 from typing import List, Tuple
-from . import _pyferris
+from pyferris import _pyferris
 
 __all__ = [
     # File I/O classes

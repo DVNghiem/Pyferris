@@ -6,7 +6,7 @@ capabilities, supporting various formats including text, CSV, and JSON.
 """
 
 from typing import List, Any
-from . import _pyferris
+from pyferris import _pyferris
 
 __all__ = [
     # File I/O classes

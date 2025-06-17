@@ -5,7 +5,7 @@ This module provides efficient file reading/writing operations with parallel pro
 """
 
 from typing import List, Dict, Any, Optional, Callable, Tuple
-from . import _pyferris
+from pyferris import _pyferris
 
 __all__ = [
     # File I/O classes

@@ -5,7 +5,7 @@ This module provides efficient file Reading operations with buffering and parall
 """
 
 from typing import List, Any, Callable
-from . import _pyferris
+from pyferris import _pyferris
 
 __all__ = [
     # File I/O classes
