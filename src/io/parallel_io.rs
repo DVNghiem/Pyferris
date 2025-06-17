@@ -39,26 +39,31 @@ impl ParallelFileProcessor {
                 .map_err(|e| ParallelExecutionError::new_err(format!("Failed to set thread pool: {}", e)))?;
         }
 
-        let results: Result<Vec<_>, _> = file_paths
+        // First, read all files in parallel (no GIL needed for file I/O)
+        let file_contents: Result<Vec<_>, _> = file_paths
             .par_iter()
             .map(|file_path| {
-                Python::with_gil(|py| {
-                    // Read file content
-                    let content = match std::fs::read_to_string(file_path) {
-                        Ok(c) => c,
-                        Err(e) => return Err(format!("Failed to read {}: {}", file_path, e)),
-                    };
-                    
-                    // Call Python processor function
-                    let args = (file_path.as_str(), content.as_str());
-                    processor_func.call1(py, args)
-                        .map_err(|e| format!("Processor function failed for {}: {}", file_path, e))
-                })
+                std::fs::read_to_string(file_path)
+                    .map_err(|e| format!("Failed to read {}: {}", file_path, e))
+                    .map(|content| (file_path.clone(), content))
             })
             .collect();
 
-        let results = results
+        let file_contents = file_contents
             .map_err(|e| ParallelExecutionError::new_err(e))?;
+
+        // Then process with Python function sequentially to avoid GIL deadlock
+        let results: Result<Vec<_>, _> = py.allow_threads(|| {
+            file_contents.into_iter().map(|(file_path, content)| {
+                Python::with_gil(|py| {
+                    let args = (file_path.as_str(), content.as_str());
+                    processor_func.call1(py, args)
+                        .map_err(|e| ParallelExecutionError::new_err(format!("Processor function failed for {}: {}", file_path, e)))
+                })
+            }).collect::<Result<Vec<_>, _>>()
+        });
+
+        let results = results?;
 
         let py_results = PyList::empty(py);
         for result in results {
@@ -132,25 +137,18 @@ impl ParallelFileProcessor {
         
         // Filter files if filter function is provided
         let filtered_paths = if let Some(filter_func) = file_filter {
-            let filtered: Result<Vec<_>, _> = paths
-                .par_iter()
-                .filter_map(|path| {
-                    Python::with_gil(|py| {
-                        match filter_func.call1(py, (path.as_str(),)) {
-                            Ok(result) => {
-                                match result.extract::<bool>(py) {
-                                    Ok(true) => Some(Ok(path.clone())),
-                                    Ok(false) => None,
-                                    Err(e) => Some(Err(format!("Filter function error for {}: {}", path, e))),
-                                }
-                            }
-                            Err(e) => Some(Err(format!("Filter function failed for {}: {}", path, e))),
-                        }
-                    })
-                })
-                .collect();
-            
-            filtered.map_err(|e| ParallelExecutionError::new_err(e))?
+            // Apply filter sequentially to avoid GIL issues
+            let mut filtered = Vec::new();
+            for path in paths {
+                let should_include = filter_func.call1(py, (path.as_str(),))?
+                    .extract::<bool>(py)
+                    .map_err(|e| ParallelExecutionError::new_err(format!("Filter function error for {}: {}", path, e)))?;
+                
+                if should_include {
+                    filtered.push(path);
+                }
+            }
+            filtered
         } else {
             paths
         };
@@ -241,26 +239,23 @@ pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usi
         .map(|chunk| chunk.to_vec())
         .collect();
 
+    // Process chunks sequentially to avoid GIL deadlock
     let results: Result<Vec<_>, _> = chunks
-        .par_iter()
+        .into_iter()
         .enumerate()
-        .map(|(chunk_idx, chunk)| -> Result<PyObject, String> {
-            Python::with_gil(|py| {
-                let chunk_lines = PyList::empty(py);
-                for line in chunk {
-                    chunk_lines.append(*line)
-                        .map_err(|e| format!("Failed to append line: {}", e))?;
-                }
-                
-                let args = (chunk_idx, &chunk_lines);
-                processor_func.call1(py, args)
-                    .map_err(|e| format!("Processor function failed for chunk {}: {}", chunk_idx, e))
-            })
+        .map(|(chunk_idx, chunk)| -> PyResult<PyObject> {
+            let chunk_lines = PyList::empty(py);
+            for line in chunk {
+                chunk_lines.append(line)?;
+            }
+            
+            let args = (chunk_idx, &chunk_lines);
+            processor_func.call1(py, args)
+                .map_err(|e| ParallelExecutionError::new_err(format!("Processor function failed for chunk {}: {}", chunk_idx, e)))
         })
         .collect();
 
-    let results = results
-        .map_err(|e| ParallelExecutionError::new_err(e))?;
+    let results = results?;
 
     let py_results = PyList::empty(py);
     for result in results {
