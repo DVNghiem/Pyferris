@@ -5,7 +5,8 @@ Welcome to the PyFerris documentation! This guide provides comprehensive informa
 ## Table of Contents
 
 - [Core Features](core.md) - Parallel operations and basic functionality
-- [Executor](executor.md) - Task execution and thread pool management
+- [Executor](executor.md) - Task execution and Rayon-powered thread pool management
+- [Advanced Features](advanced.md) - Advanced parallel operations and batch processing
 - [I/O Operations](io.md) - File I/O and parallel data processing
 - [Examples](examples.md) - Practical usage examples
 

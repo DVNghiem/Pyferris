@@ -84,6 +84,25 @@ class Executor(concurrent.futures.Executor):
         """
         return self._executor.map(func, iterable)
 
+    def set_chunk_size(self, chunk_size: int):
+        """
+        Set the minimum chunk size for parallel processing.
+        
+        For small datasets, parallel processing overhead might outweigh benefits.
+        This sets the threshold below which sequential processing is used.
+        
+        :param chunk_size: Minimum number of items to use parallel processing.
+        """
+        self._executor.set_chunk_size(chunk_size)
+    
+    def get_chunk_size(self) -> int:
+        """
+        Get the current chunk size threshold.
+        
+        :return: Current chunk size threshold.
+        """
+        return self._executor.get_chunk_size()
+
     def shutdown(self, wait=True):
         """
         Shutdown the executor, optionally waiting for all tasks to complete.
@@ -107,5 +126,38 @@ class Executor(concurrent.futures.Executor):
         """
         self.shutdown()
         return False
+
+    def submit_computation(self, computation_type: str, data: list) -> float:
+        """
+        Submit a pure Rust computation task that can truly benefit from parallelism.
+        
+        This method performs computations entirely in Rust without Python callback overhead,
+        allowing for true parallel speedup on CPU-bound tasks.
+        
+        :param computation_type: Type of computation ('sum', 'product', 'square_sum', 'heavy_computation')
+        :param data: List of numbers to process
+        :return: Computation result
+        """
+        # Use a simple approach - the Rust side will handle Python acquisition
+        return self._executor.submit_computation(computation_type, data)
+    
+    def submit_batch(self, tasks: list) -> list:
+        """
+        Submit multiple tasks for batch execution.
+        
+        :param tasks: List of tuples (function, args_tuple_or_None)
+        :return: List of results
+        """
+        # Convert Python tasks to the format expected by Rust
+        rust_tasks = []
+        for task in tasks:
+            if isinstance(task, tuple) and len(task) == 2:
+                func, args = task
+                rust_tasks.append((func, args))
+            else:
+                # Assume it's just a function with no args
+                rust_tasks.append((task, None))
+        
+        return self._executor.submit_batch(rust_tasks)
 
 __all__ = ["Executor"]

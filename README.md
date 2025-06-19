@@ -8,7 +8,7 @@ PyFerris offers a comprehensive set of features, from basic parallel operations 
 
 ### Level 1: Basic Features
 - **Core Parallel Operations**: `parallel_map`, `parallel_filter`, `parallel_reduce`, `parallel_starmap` for efficient parallel processing.
-- **Task Executor**: A thread pool-like `Executor` for submitting and managing tasks.
+- **Task Executor**: A Rayon-powered `Executor` with true parallel computation support, Python callback execution, and configurable performance tuning.
 - **Basic Configuration**: Control number of workers and chunk sizes with `set_worker_count` and `set_chunk_size`.
 - **Error Handling**: Robust error propagation with `ParallelExecutionError` and flexible strategies (`raise`, `ignore`, `collect`).
 
@@ -123,12 +123,24 @@ results = parallel_map(lambda x: x**2, range(1000))
 evens = parallel_filter(lambda x: x % 2 == 0, range(1000))
 total = parallel_reduce(lambda x, y: x + y, range(1000))
 
-# Task execution
-from pyferris import Executor
+# Task execution with improved Rayon-based executor
+from pyferris.executor import Executor
 
+# Python callback tasks (GIL-limited but still beneficial)
 with Executor(max_workers=4) as executor:
+    # Single task submission
     future = executor.submit(expensive_function, data)
     result = future.result()
+    
+    # Multiple tasks (recommended approach)
+    results = executor.map(process_function, data_list)
+    
+    # Pure Rust computation (true parallel speedup)
+    numbers = list(range(1, 1000))
+    parallel_sum = executor.submit_computation('heavy_computation', numbers)
+    
+    # Performance tuning
+    executor.set_chunk_size(50)  # Optimize for your workload
 
 # File I/O operations
 from pyferris.io import simple_io, csv, json
