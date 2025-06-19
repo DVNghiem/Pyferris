@@ -1,15 +1,24 @@
 # Executor
 
-The PyFerris Executor provides advanced task management and thread pool functionality for complex parallel workloads. Built on Rust's high-performance threading primitives, it offers fine-grained control over task execution, scheduling, and resource management.
+The PyFerris Executor provides advanced task management and thread pool functionality for complex parallel workloads. Built on Rust's Rayon parallel processing framework, it offers both Python callback support and high-performance pure Rust computations.
 
 ## Overview
 
 The Executor module provides:
 - Thread pool management with configurable worker counts
-- Task queuing and scheduling
-- Async task execution
-- Resource monitoring and management
-- Advanced scheduling strategies
+- Task queuing and scheduling with Rayon integration
+- Python callback execution (with GIL limitations)
+- Pure Rust computations for true parallel speedup
+- Configurable chunking strategies for optimal performance
+- Batch processing capabilities
+
+## Performance Characteristics
+
+### Python Callback Limitations
+Due to Python's Global Interpreter Lock (GIL), Python callback-based tasks have limited parallel speedup. The executor still provides benefits through better CPU utilization and task scheduling, but true parallel speedup is constrained.
+
+### Pure Rust Computations
+For CPU-intensive mathematical operations, the executor provides `submit_computation()` which performs computations entirely in Rust, achieving true parallel speedup that scales with worker count.
 
 ## Core Components
 
@@ -20,39 +29,30 @@ The main executor class for managing parallel tasks and thread pools.
 #### Constructor
 
 ```python
-from pyferris import Executor
+from pyferris.executor import Executor
 
 # Create executor with default settings (CPU count workers)
 executor = Executor()
 
 # Create executor with specific worker count
 executor = Executor(max_workers=8)
-
-# Create executor with advanced configuration
-executor = Executor(
-    max_workers=16,
-    queue_capacity=1000,
-    thread_stack_size=2_097_152  # 2MB stack size
-)
 ```
 
 **Parameters:**
 - `max_workers` (int, optional): Maximum number of worker threads. Defaults to CPU count.
-- `queue_capacity` (int, optional): Maximum task queue size. Defaults to 10,000.
-- `thread_stack_size` (int, optional): Stack size per thread in bytes. Defaults to system default.
 
 ## Basic Usage
 
-### Submitting Tasks
+### Submitting Python Callback Tasks
 
 ```python
-from pyferris import Executor
+from pyferris.executor import Executor
 import time
 
 def cpu_intensive_task(n):
     """Simulate CPU-intensive work."""
     result = 0
-    for i in range(n * 1000000):
+    for i in range(n * 1000):
         result += i
     return result
 
@@ -63,32 +63,70 @@ future = executor.submit(cpu_intensive_task, 100)
 result = future.result()  # Blocks until completion
 print(f"Task result: {result}")
 
-# Submit multiple tasks
-tasks = [executor.submit(cpu_intensive_task, i) for i in range(10, 20)]
-results = [task.result() for task in tasks]
+# Submit multiple tasks using map (recommended for multiple tasks)
+numbers = list(range(10, 20))
+results = executor.map(cpu_intensive_task, numbers)
 print(f"All results: {results}")
 ```
 
-### Batch Task Submission
+### Pure Rust Computations (High Performance)
+
+For CPU-intensive mathematical operations, use `submit_computation()` for true parallel speedup:
 
 ```python
-def process_data_chunk(data_chunk):
-    # Process a chunk of data
-    return sum(x ** 2 for x in data_chunk)
+# Test data
+numbers = list(range(1, 101))
 
-# Prepare data chunks
-data = list(range(10000))
-chunk_size = 1000
-chunks = [data[i:i+chunk_size] for i in range(0, len(data), chunk_size)]
+# Available computation types:
+# - 'sum': Parallel sum of all numbers
+# - 'product': Parallel product of all numbers  
+# - 'square_sum': Parallel sum of squares
+# - 'heavy_computation': CPU-intensive computation for benchmarking
 
-executor = Executor(max_workers=8)
+# Pure Rust parallel computation
+result = executor.submit_computation('heavy_computation', numbers)
+print(f"Heavy computation result: {result}")
 
-# Submit all chunks as tasks
-futures = executor.map(process_data_chunk, chunks)
-results = list(futures)  # Collect all results
+# Simple operations
+sum_result = executor.submit_computation('sum', numbers)
+print(f"Parallel sum: {sum_result}")
 
-print(f"Processed {len(results)} chunks")
-print(f"Total sum: {sum(results)}")
+square_sum = executor.submit_computation('square_sum', numbers)
+print(f"Parallel sum of squares: {square_sum}")
+```
+
+### Performance Tuning
+
+```python
+# Configure chunk size for better performance
+executor = Executor(max_workers=4)
+
+# Set smaller chunk size for better load balancing
+executor.set_chunk_size(10)
+
+# Check current chunk size
+current_chunk_size = executor.get_chunk_size()
+print(f"Current chunk size: {current_chunk_size}")
+
+# Get worker information
+worker_count = executor.get_worker_count()
+is_active = executor.is_active()
+print(f"Workers: {worker_count}, Active: {is_active}")
+```
+
+### Batch Processing
+
+```python
+def process_item(item):
+    return item * item
+
+# Process multiple items in batches
+items = list(range(100))
+batch_tasks = [(process_item, (item,)) for item in items]
+
+# Submit batch of tasks
+results = executor.submit_batch(batch_tasks)
+print(f"Batch results: {results[:10]}...")  # Show first 10 results
 ```
 
 ## Advanced Features
@@ -554,3 +592,63 @@ def optimize_executor_performance():
    ```
 
 The Executor provides powerful task management capabilities that scale from simple parallel execution to complex distributed processing workflows.
+
+## Performance Recommendations
+
+### When to Use Each Method
+
+1. **`submit()`** - Single tasks or when you need Future objects
+   ```python
+   # Good for single tasks
+   future = executor.submit(my_function)
+   result = future.result()
+   ```
+
+2. **`map()`** - Multiple similar tasks (most common use case)
+   ```python
+   # Best for multiple tasks of the same type
+   results = executor.map(process_function, data_list)
+   ```
+
+3. **`submit_computation()`** - CPU-intensive mathematical operations
+   ```python
+   # Best performance for pure computations
+   result = executor.submit_computation('heavy_computation', numbers)
+   ```
+
+4. **`submit_batch()`** - Mixed task types or complex batching
+   ```python
+   # Good for heterogeneous task batches
+   results = executor.submit_batch(mixed_tasks)
+   ```
+
+### Performance Scaling Examples
+
+The following benchmarks show performance scaling with worker count:
+
+```
+Pure Rust Computation (200 numbers, heavy computation):
+- 1 worker:  0.2246s
+- 2 workers: 0.1065s (2.11x speedup)
+- 4 workers: 0.0749s (3.00x speedup)
+- 8 workers: 0.0467s (4.81x speedup)
+
+Python Callbacks (20 CPU-intensive tasks):
+- Sequential: 0.5461s
+- 4 workers:  0.6061s (0.90x speedup due to GIL)
+```
+
+### Optimization Tips
+
+1. **Choose the right method**: Use `submit_computation()` for mathematical operations
+2. **Tune chunk size**: Smaller chunks = better load balancing, larger chunks = less overhead
+3. **Consider task overhead**: Very quick tasks may not benefit from parallelization
+4. **Use context managers**: Ensure proper cleanup with `with` statement
+5. **Monitor worker utilization**: Adjust worker count based on CPU cores and task characteristics
+
+### Common Pitfalls
+
+- **GIL limitations**: Python callbacks don't scale linearly due to GIL
+- **Task overhead**: Parallelizing very fast tasks can be slower than sequential
+- **Memory usage**: More workers = more memory usage
+- **I/O bound tasks**: Use async patterns instead of thread parallelism for I/O
