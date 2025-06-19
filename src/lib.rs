@@ -20,12 +20,14 @@ mod executor;
 mod utils;
 mod error;
 mod io;
+mod advanced;
 
 use core::*;
 use executor::*;
 use utils::*;
 use error::*;
 use io::*;
+use advanced::*;
 
 /// Pyferris Rust Extensions
 /// High-performance Rust implementations
@@ -54,6 +56,14 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     
     // Register simple IO functions
     register_io(py, m)?;
+    
+    // Register advanced parallel operations
+    m.add_function(wrap_pyfunction!(parallel_sort, m)?)?;
+    m.add_function(wrap_pyfunction!(parallel_group_by, m)?)?;
+    m.add_function(wrap_pyfunction!(parallel_unique, m)?)?;
+    m.add_function(wrap_pyfunction!(parallel_partition, m)?)?;
+    m.add_function(wrap_pyfunction!(parallel_chunks, m)?)?;
+    m.add_class::<BatchProcessor>()?;
     
     // Register custom exception
     m.add("ParallelExecutionError", py.get_type::<ParallelExecutionError>())?;
