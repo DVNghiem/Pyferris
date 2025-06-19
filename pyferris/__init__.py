@@ -2,7 +2,7 @@
 PyFerris - High-performance parallel processing library for Python, powered by Rust and PyO3.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 from .core import parallel_map, parallel_reduce, parallel_filter, parallel_starmap
 from .config import Config, get_chunk_size, get_worker_count, set_chunk_size, set_worker_count
 from .executor import Executor
