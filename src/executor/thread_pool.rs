@@ -23,6 +23,7 @@ impl Executor {
     }
 
     /// Submit a single task
+    #[pyo3(signature = (func, args = None))]
     pub fn submit(&self, func: Bound<PyAny>, args: Option<Bound<PyTuple>>) -> PyResult<PyObject> {
         let py = func.py();
         let args = args.unwrap_or_else(|| PyTuple::empty(py));
