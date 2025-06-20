@@ -15,7 +15,10 @@ from .advanced import (
 # Level 3: Advanced Features
 from .pipeline import Pipeline, Chain, pipeline_map
 from .async_ops import AsyncExecutor, AsyncTask, async_parallel_map, async_parallel_filter
-from .shared_memory import SharedArray, SharedDict, SharedQueue, SharedCounter
+from .shared_memory import (
+    SharedArray, SharedArrayInt, SharedArrayStr, SharedArrayObj,
+    SharedDict, SharedQueue, SharedCounter, create_shared_array
+)
 from .scheduler import (
     WorkStealingScheduler, RoundRobinScheduler, AdaptiveScheduler,
     PriorityScheduler, TaskPriority, execute_with_priority, create_priority_task
@@ -70,9 +73,13 @@ __all__ = [
     
     # Level 3: Shared Memory
     "SharedArray",
+    "SharedArrayInt",
+    "SharedArrayStr", 
+    "SharedArrayObj",
     "SharedDict",
     "SharedQueue", 
     "SharedCounter",
+    "create_shared_array",
     
     # Level 3: Custom Schedulers
     "WorkStealingScheduler",
