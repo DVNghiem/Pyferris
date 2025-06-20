@@ -12,6 +12,15 @@ from .advanced import (
     parallel_chunks, BatchProcessor, ProgressTracker, ResultCollector
 )
 
+# Level 3: Advanced Features
+from .pipeline import Pipeline, Chain, pipeline_map
+from .async_ops import AsyncExecutor, AsyncTask, async_parallel_map, async_parallel_filter
+from .shared_memory import SharedArray, SharedDict, SharedQueue, SharedCounter
+from .scheduler import (
+    WorkStealingScheduler, RoundRobinScheduler, AdaptiveScheduler,
+    PriorityScheduler, TaskPriority, execute_with_priority, create_priority_task
+)
+
 __all__ = [
     # core base functionality
     "__version__",
@@ -46,5 +55,31 @@ __all__ = [
     "parallel_chunks",
     "BatchProcessor",
     "ProgressTracker", 
-    "ResultCollector"
+    "ResultCollector",
+    
+    # Level 3: Pipeline Processing
+    "Pipeline",
+    "Chain", 
+    "pipeline_map",
+    
+    # Level 3: Async Support
+    "AsyncExecutor",
+    "AsyncTask",
+    "async_parallel_map",
+    "async_parallel_filter",
+    
+    # Level 3: Shared Memory
+    "SharedArray",
+    "SharedDict",
+    "SharedQueue", 
+    "SharedCounter",
+    
+    # Level 3: Custom Schedulers
+    "WorkStealingScheduler",
+    "RoundRobinScheduler",
+    "AdaptiveScheduler",
+    "PriorityScheduler",
+    "TaskPriority",
+    "execute_with_priority",
+    "create_priority_task"
 ]
