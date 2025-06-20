@@ -86,9 +86,13 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     
     // Register Level 3: Shared Memory
     m.add_class::<SharedArray>()?;
+    m.add_class::<SharedArrayInt>()?;
+    m.add_class::<SharedArrayStr>()?;
+    m.add_class::<SharedArrayObj>()?;
     m.add_class::<SharedDict>()?;
     m.add_class::<SharedQueue>()?;
     m.add_class::<SharedCounter>()?;
+    m.add_function(wrap_pyfunction!(create_shared_array, m)?)?;
     
     // Register Level 3: Custom Schedulers
     m.add_class::<WorkStealingScheduler>()?;
