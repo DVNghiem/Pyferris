@@ -24,6 +24,11 @@ from .scheduler import (
     PriorityScheduler, TaskPriority, execute_with_priority, create_priority_task
 )
 
+# Level 4: Expert Features
+from .concurrent import ConcurrentHashMap, LockFreeQueue, AtomicCounter, RwLockDict
+from .memory import MemoryPool, memory_mapped_array, memory_mapped_array_2d, memory_mapped_info, create_temp_mmap
+from .profiling import Profiler, auto_tune_workers, profile_parallel_operation
+
 __all__ = [
     # core base functionality
     "__version__",
@@ -88,5 +93,23 @@ __all__ = [
     "PriorityScheduler",
     "TaskPriority",
     "execute_with_priority",
-    "create_priority_task"
+    "create_priority_task",
+    
+    # Level 4: Concurrent Data Structures
+    "ConcurrentHashMap",
+    "LockFreeQueue",
+    "AtomicCounter", 
+    "RwLockDict",
+    
+    # Level 4: Memory Management
+    "MemoryPool",
+    "memory_mapped_array",
+    "memory_mapped_array_2d",
+    "memory_mapped_info",
+    "create_temp_mmap",
+    
+    # Level 4: Performance Profiling
+    "Profiler",
+    "auto_tune_workers",
+    "profile_parallel_operation"
 ]
