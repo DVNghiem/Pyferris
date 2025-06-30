@@ -25,11 +25,17 @@ num_cpus = "1.0"
 [target.'cfg(not(any(target_env = "musl", target_os = "freebsd", target_os = "openbsd", target_os = "windows")))'.dependencies]
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["disable_initial_exec_tls"] }
 
+[target.'cfg(target_env = "musl")'.dependencies]
+# Use mimalloc for musl targets (Alpine Linux) instead of jemalloc
+mimalloc = "0.1.47"
+
 [build-dependencies]
 pyo3-build-config = "=0.25"
 
 [features]
+default = []
 mimalloc = ["dep:mimalloc"]
+musl = ["mimalloc"]
 
 [profile.release]
 codegen-units = 1
