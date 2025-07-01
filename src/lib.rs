@@ -25,6 +25,9 @@ mod async_ops;
 mod pipeline;
 mod shared_memory;
 mod scheduler;
+mod concurrent;
+mod memory;
+mod profiling;
 
 use core::*;
 use executor::*;
@@ -36,6 +39,9 @@ use async_ops::*;
 use pipeline::*;
 use shared_memory::*;
 use scheduler::*;
+use concurrent::*;
+use memory::*;
+use profiling::*;
 
 /// Pyferris Rust Extensions
 /// High-performance Rust implementations
@@ -102,6 +108,23 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<TaskPriority>()?;
     m.add_function(wrap_pyfunction!(execute_with_priority, m)?)?;
     m.add_function(wrap_pyfunction!(create_priority_task, m)?)?;
+    
+    // Register Level 4: Performance Profiling  
+    m.add_class::<Profiler>()?;
+    m.add_function(wrap_pyfunction!(auto_tune_workers, m)?)?;
+    
+    // Register Level 4: Memory Management
+    m.add_class::<MemoryPool>()?;
+    m.add_function(wrap_pyfunction!(memory_mapped_array, m)?)?;
+    m.add_function(wrap_pyfunction!(memory_mapped_array_2d, m)?)?;
+    m.add_function(wrap_pyfunction!(memory_mapped_info, m)?)?;
+    m.add_function(wrap_pyfunction!(create_temp_mmap, m)?)?;
+    
+    // Register Level 4: Concurrent Data Structures
+    m.add_class::<ConcurrentHashMap>()?;
+    m.add_class::<LockFreeQueue>()?;
+    m.add_class::<AtomicCounter>()?;
+    m.add_class::<RwLockDict>()?;
     
     // Register custom exception
     m.add("ParallelExecutionError", py.get_type::<ParallelExecutionError>())?;
