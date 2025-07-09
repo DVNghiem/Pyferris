@@ -29,6 +29,17 @@ from .concurrent import ConcurrentHashMap, LockFreeQueue, AtomicCounter, RwLockD
 from .memory import MemoryPool, memory_mapped_array, memory_mapped_array_2d, memory_mapped_info, create_temp_mmap
 from .profiling import Profiler, auto_tune_workers, profile_parallel_operation
 
+# Level 5: Enterprise Features
+from .distributed import (
+    DistributedCluster, create_cluster, distributed_map, distributed_filter,
+    async_distributed_map, ClusterManager, LoadBalancer, DistributedExecutor,
+    DistributedBatchProcessor, cluster_map, distributed_reduce
+)
+from .fault_tolerance import (
+    RetryExecutor, CircuitBreaker, CheckpointManager, AutoCheckpoint,
+    retry, circuit_breaker, with_checkpoints, resilient_operation, ResilientOperation
+)
+
 __all__ = [
     # core base functionality
     "__version__",
@@ -111,5 +122,29 @@ __all__ = [
     # Level 4: Performance Profiling
     "Profiler",
     "auto_tune_workers",
-    "profile_parallel_operation"
+    "profile_parallel_operation",
+    
+    # Level 5: Distributed Processing
+    "DistributedCluster",
+    "create_cluster",
+    "distributed_map", 
+    "distributed_filter",
+    "async_distributed_map",
+    "ClusterManager",
+    "LoadBalancer",
+    "DistributedExecutor",
+    "DistributedBatchProcessor",
+    "cluster_map",
+    "distributed_reduce",
+    
+    # Level 5: Fault Tolerance
+    "RetryExecutor",
+    "CircuitBreaker",
+    "CheckpointManager", 
+    "AutoCheckpoint",
+    "retry",
+    "circuit_breaker",
+    "with_checkpoints",
+    "resilient_operation",
+    "ResilientOperation"
 ]
