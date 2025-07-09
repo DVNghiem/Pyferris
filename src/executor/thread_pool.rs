@@ -2,9 +2,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
 use rayon::prelude::*;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use smallvec::SmallVec;
 
-/// Task executor for managing parallel tasks
+/// High-performance task executor with advanced optimizations
 #[pyclass]
 pub struct Executor {
     #[pyo3(get, set)]
@@ -12,6 +13,10 @@ pub struct Executor {
     thread_pool: Option<rayon::ThreadPool>,
     // Minimum chunk size for parallel processing
     min_chunk_size: AtomicUsize,
+    // Track if executor is active
+    is_active: AtomicBool,
+    // Performance counters
+    task_count: AtomicUsize,
 }
 
 #[pymethods]
@@ -32,6 +37,8 @@ impl Executor {
             thread_pool: Some(thread_pool),
             // Start with a reasonable chunk size based on worker count
             min_chunk_size: AtomicUsize::new((1000.max(max_workers * 4)).min(10000)),
+            is_active: AtomicBool::new(true),
+            task_count: AtomicUsize::new(0),
         })
     }
 
@@ -45,7 +52,7 @@ impl Executor {
             let args_obj: Arc<PyObject> = Arc::new(args.into());
             
             py.allow_threads(|| {
-                pool.install(|| {
+                pool.install(|| -> PyResult<PyObject> {
                     Python::with_gil(|py| {
                         let bound_func = func_obj.bind(py);
                         let bound_args = args_obj.bind(py).downcast::<PyTuple>()?;
@@ -62,19 +69,14 @@ impl Executor {
     }
 
     /// Submit a single task (for compatibility with asyncio.run_in_executor)
-    /// Note: For CPU-bound Python tasks, parallelism is limited by GIL.
-    /// Use map() for better performance with multiple tasks.
     pub fn submit(&self, func: Bound<PyAny>) -> PyResult<PyObject> {
         let py = func.py();
         
         if let Some(ref pool) = self.thread_pool {
             let func_obj: Arc<PyObject> = Arc::new(func.into());
             
-            // For single tasks, the overhead of thread pool might not be worth it
-            // But we still use it to maintain consistent behavior and allow
-            // better CPU utilization in some cases
             py.allow_threads(|| {
-                pool.install(|| {
+                pool.install(|| -> PyResult<PyObject> {
                     Python::with_gil(|py| {
                         let bound_func = func_obj.bind(py);
                         let result = bound_func.call0()?;
@@ -89,47 +91,72 @@ impl Executor {
         }
     }
 
-    /// Submit multiple tasks and collect results
+    /// Submit multiple tasks and collect results with advanced optimizations
     pub fn map(&self, func: Bound<PyAny>, iterable: Bound<PyAny>) -> PyResult<Py<PyList>> {
         let py = func.py();
-        // Convert to PyObjects to avoid Sync issues
-        let items: Vec<PyObject> = iterable.try_iter()?.map(|item| item.map(|i| i.into())).collect::<PyResult<Vec<_>>>()?;
+        self.task_count.fetch_add(1, Ordering::Relaxed);
+        
+        // Convert to PyObjects with optimized allocation
+        let items: Vec<PyObject> = {
+            let iter = iterable.try_iter()?;
+            let mut items = Vec::new();
+            
+            // Try to get size hint for better allocation
+            let (lower, upper) = iter.size_hint();
+            if let Some(upper) = upper {
+                items.reserve(upper);
+            } else if lower > 0 {
+                items.reserve(lower);
+            }
+            
+            for item in iter {
+                items.push(item?.into());
+            }
+            items
+        };
         
         if items.is_empty() {
             return Ok(PyList::empty(py).into());
         }
         
-        // For small datasets, use sequential processing to avoid overhead
-        let min_chunk_size = self.min_chunk_size.load(std::sync::atomic::Ordering::Relaxed);
-        if items.len() < min_chunk_size.min(self.max_workers * 2) {
-            let results: PyResult<Vec<PyObject>> = items
-                .iter()
-                .map(|item| -> PyResult<PyObject> {
-                    let bound_item = item.bind(py);
-                    let result = func.call1((bound_item,))?;
-                    Ok(result.into())
-                })
-                .collect();
-            
-            let py_list = PyList::new(py, results?)?;
-            return Ok(py_list.into());
-        }
+        // Advanced chunking strategy
+        let min_chunk_size = self.min_chunk_size.load(Ordering::Relaxed);
+        let optimal_chunk_size = match items.len() {
+            0..=1000 => {
+                // For small datasets, consider sequential processing
+                if items.len() < min_chunk_size.min(self.max_workers * 2) {
+                    // Sequential processing for very small datasets
+                    let results: PyResult<Vec<PyObject>> = items
+                        .iter()
+                        .map(|item| -> PyResult<PyObject> {
+                            let bound_item = item.bind(py);
+                            let result = func.call1((bound_item,))?;
+                            Ok(result.into())
+                        })
+                        .collect();
+                    
+                    let py_list = PyList::new(py, results?)?;
+                    return Ok(py_list.into());
+                }
+                items.len().max(1)
+            }
+            1001..=10000 => (items.len() / self.max_workers).max(100).min(1000),
+            10001..=100000 => (items.len() / (self.max_workers * 2)).max(500).min(2000),
+            _ => (items.len() / (self.max_workers * 4)).max(1000).min(5000),
+        };
         
         let func: Arc<PyObject> = Arc::new(func.into());
         
         // Use our custom thread pool if available, otherwise fall back to global pool
-        let results: Vec<PyObject> = if let Some(ref pool) = self.thread_pool {
+        let results: Vec<SmallVec<[PyObject; 8]>> = if let Some(ref pool) = self.thread_pool {
             py.allow_threads(|| {
-                pool.install(|| {
-                    // Process in chunks to reduce GIL contention
-                    let chunk_size = (items.len() / self.max_workers).max(1).min(1000);
-                    
-                    let chunk_results: PyResult<Vec<Vec<PyObject>>> = items
-                        .par_chunks(chunk_size)
-                        .map(|chunk| -> PyResult<Vec<PyObject>> {
+                pool.install(|| -> PyResult<Vec<SmallVec<[PyObject; 8]>>> {
+                    let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+                        .par_chunks(optimal_chunk_size)
+                        .map(|chunk| -> PyResult<SmallVec<[PyObject; 8]>> {
                             Python::with_gil(|py| {
+                                let mut chunk_results = SmallVec::with_capacity(chunk.len());
                                 let bound_func = func.bind(py);
-                                let mut chunk_results = Vec::with_capacity(chunk.len());
                                 
                                 for item in chunk {
                                     let bound_item = item.bind(py);
@@ -142,21 +169,18 @@ impl Executor {
                         })
                         .collect();
                     
-                    // Flatten the results
-                    chunk_results.map(|chunks| chunks.into_iter().flatten().collect())
+                    chunk_results
                 })
             })?
         } else {
             // Use global pool as fallback with chunking
-            py.allow_threads(|| {
-                let chunk_size = (items.len() / rayon::current_num_threads()).max(1).min(1000);
-                
-                let chunk_results: PyResult<Vec<Vec<PyObject>>> = items
-                    .par_chunks(chunk_size)
-                    .map(|chunk| -> PyResult<Vec<PyObject>> {
+            py.allow_threads(|| -> PyResult<Vec<SmallVec<[PyObject; 8]>>> {
+                let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+                    .par_chunks(optimal_chunk_size)
+                    .map(|chunk| -> PyResult<SmallVec<[PyObject; 8]>> {
                         Python::with_gil(|py| {
+                            let mut chunk_results = SmallVec::with_capacity(chunk.len());
                             let bound_func = func.bind(py);
-                            let mut chunk_results = Vec::with_capacity(chunk.len());
                             
                             for item in chunk {
                                 let bound_item = item.bind(py);
@@ -169,12 +193,19 @@ impl Executor {
                     })
                     .collect();
                 
-                // Flatten the results
-                chunk_results.map(|chunks| chunks.into_iter().flatten().collect())
+                chunk_results
             })?
         };
 
-        let py_list = PyList::new(py, results)?;
+        // Flatten with capacity hint for better performance
+        let total_capacity: usize = results.iter().map(|v| v.len()).sum();
+        let mut final_results = Vec::with_capacity(total_capacity);
+        
+        for chunk in results {
+            final_results.extend(chunk);
+        }
+
+        let py_list = PyList::new(py, final_results)?;
         Ok(py_list.into())
     }
 
@@ -199,7 +230,7 @@ impl Executor {
         
         if let Some(ref pool) = self.thread_pool {
             let results = py.allow_threads(|| {
-                pool.install(|| {
+                pool.install(|| -> PyResult<Vec<PyObject>> {
                     let chunk_results: PyResult<Vec<PyObject>> = task_objects
                         .par_iter()
                         .map(|(func_obj, args_obj)| -> PyResult<PyObject> {
@@ -249,21 +280,31 @@ impl Executor {
 
     /// Check if the executor is active
     pub fn is_active(&self) -> bool {
-        self.thread_pool.is_some()
+        self.is_active.load(Ordering::Relaxed) && self.thread_pool.is_some()
+    }
+
+    /// Get performance statistics
+    pub fn get_stats(&self) -> (usize, usize, bool) {
+        (
+            self.max_workers,
+            self.task_count.load(Ordering::Relaxed),
+            self.is_active()
+        )
     }
 
     /// Set the minimum chunk size for parallel processing
     pub fn set_chunk_size(&self, chunk_size: usize) {
-        self.min_chunk_size.store(chunk_size, std::sync::atomic::Ordering::Relaxed);
+        self.min_chunk_size.store(chunk_size, Ordering::Relaxed);
     }
 
-    /// Get the current chunk size
+    /// Get the current chunk size setting
     pub fn get_chunk_size(&self) -> usize {
-        self.min_chunk_size.load(std::sync::atomic::Ordering::Relaxed)
+        self.min_chunk_size.load(Ordering::Relaxed)
     }
 
     /// Shutdown the executor
     pub fn shutdown(&mut self) {
+        self.is_active.store(false, Ordering::Relaxed);
         // Drop the thread pool to shut it down
         self.thread_pool = None;
     }
@@ -287,7 +328,7 @@ impl Executor {
     pub fn submit_computation(&self, computation_type: &str, data: Vec<f64>) -> PyResult<f64> {        
         if let Some(ref pool) = self.thread_pool {
             let computation_type = computation_type.to_string();
-            let result = pool.install(|| {
+            let result = pool.install(|| -> Result<f64, &'static str> {
                 match computation_type.as_str() {
                     "sum" => {
                         let sum: f64 = data.par_iter().sum();

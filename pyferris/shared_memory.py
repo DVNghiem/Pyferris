@@ -448,7 +448,7 @@ class SharedDict:
             default: The default value to set if key is not found.
         
         Returns:
-            The existing value if key is present, or default if set.
+            The value associated with the key.
         """
         return self._dict.setdefault(key, default)
     
