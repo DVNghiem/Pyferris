@@ -40,6 +40,15 @@ from .fault_tolerance import (
     retry, circuit_breaker, with_checkpoints, resilient_operation, ResilientOperation
 )
 
+# Auto Garbage Collection System
+from .gc import (
+    AutoGCConfig, AutoGarbageCollector, MemoryTracker, ResourceManager,
+    ManagedMemoryPool, get_auto_gc, enable_auto_gc, disable_auto_gc, force_gc,
+    gc_stats, track_allocation, track_deallocation, register_memory_pool,
+    register_mmap_file, register_cleanup_callback, managed_memory, 
+    auto_gc_decorator, create_managed_mmap
+)
+
 __all__ = [
     # core base functionality
     "__version__",
@@ -146,5 +155,25 @@ __all__ = [
     "circuit_breaker",
     "with_checkpoints",
     "resilient_operation",
-    "ResilientOperation"
+    "ResilientOperation",
+    
+    # Auto Garbage Collection
+    "AutoGCConfig",
+    "AutoGarbageCollector",
+    "MemoryTracker",
+    "ResourceManager",
+    "ManagedMemoryPool",
+    "get_auto_gc",
+    "enable_auto_gc",
+    "disable_auto_gc",
+    "force_gc",
+    "gc_stats",
+    "track_allocation",
+    "track_deallocation",
+    "register_memory_pool",
+    "register_mmap_file",
+    "register_cleanup_callback",
+    "managed_memory",
+    "auto_gc_decorator",
+    "create_managed_mmap"
 ]
