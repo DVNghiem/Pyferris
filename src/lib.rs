@@ -28,6 +28,8 @@ mod scheduler;
 mod concurrent;
 mod memory;
 mod profiling;
+mod distributed;
+mod fault_tolerance;
 
 use core::*;
 use executor::*;
@@ -42,6 +44,8 @@ use scheduler::*;
 use concurrent::*;
 use memory::*;
 use profiling::*;
+use distributed::*;
+use fault_tolerance::*;
 
 /// Pyferris Rust Extensions
 /// High-performance Rust implementations
@@ -77,7 +81,7 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parallel_unique, m)?)?;
     m.add_function(wrap_pyfunction!(parallel_partition, m)?)?;
     m.add_function(wrap_pyfunction!(parallel_chunks, m)?)?;
-    m.add_class::<BatchProcessor>()?;
+    m.add_class::<crate::advanced::BatchProcessor>()?;
     
     // Register Level 3: Pipeline Processing
     m.add_class::<Pipeline>()?;
@@ -125,6 +129,20 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<LockFreeQueue>()?;
     m.add_class::<AtomicCounter>()?;
     m.add_class::<RwLockDict>()?;
+    
+    // Register Level 5: Distributed Processing
+    m.add_class::<ClusterManager>()?;
+    m.add_class::<LoadBalancer>()?;
+    m.add_class::<DistributedExecutor>()?;
+    m.add_class::<DistributedBatchProcessor>()?;
+    m.add_function(wrap_pyfunction!(cluster_map, m)?)?;
+    m.add_function(wrap_pyfunction!(distributed_reduce, m)?)?;
+    
+    // Register Level 5: Fault Tolerance
+    m.add_class::<RetryExecutor>()?;
+    m.add_class::<CircuitBreaker>()?;
+    m.add_class::<CheckpointManager>()?;
+    m.add_class::<AutoCheckpoint>()?;
     
     // Register custom exception
     m.add("ParallelExecutionError", py.get_type::<ParallelExecutionError>())?;
