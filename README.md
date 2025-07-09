@@ -28,6 +28,7 @@ PyFerris offers a comprehensive set of features, from basic parallel operations 
 - **Concurrent Data Structures**: Lock-free and thread-safe `ConcurrentHashMap`, `LockFreeQueue`, `AtomicCounter`, and `RwLockDict`.
 - **Memory Management**: Efficient memory usage with `MemoryPool` and `memory_mapped_array`.
 - **Performance Profiling**: Detailed profiling with `Profiler` for CPU, memory, and bottleneck analysis.
+- **Smart Caching**: High-performance `SmartCache` with multiple eviction policies (LRU, LFU, TTL, Adaptive) for immediate performance gains.
 - **Dynamic Load Balancing**: Adaptive scheduling with `AdaptiveScheduler` and `auto_tune_workers`.
 
 ### Level 5: Enterprise Features
@@ -122,6 +123,19 @@ from pyferris import parallel_map, parallel_filter, parallel_reduce
 results = parallel_map(lambda x: x**2, range(1000))
 evens = parallel_filter(lambda x: x % 2 == 0, range(1000))
 total = parallel_reduce(lambda x, y: x + y, range(1000))
+
+# High-performance caching with SmartCache
+from pyferris import SmartCache, EvictionPolicy, cached
+
+# Create intelligent cache with LRU eviction
+cache = SmartCache(max_size=1000, policy=EvictionPolicy.LRU)
+cache.put("user:123", {"name": "Alice", "age": 30})
+user = cache.get("user:123")
+
+# Function caching decorator for immediate performance gains
+@cached(max_size=100, policy=EvictionPolicy.ADAPTIVE)
+def expensive_computation(n):
+    return n * n * n
 
 # Task execution with improved Rayon-based executor
 from pyferris.executor import Executor
