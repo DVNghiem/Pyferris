@@ -511,6 +511,25 @@ fn detect_gpu_count() -> usize {
 }
 
 /// Helper function to detect specialized capabilities
+/// 
+/// This function detects various hardware capabilities including:
+/// - GPU support (CUDA, ROCm, OpenCL)
+/// - CPU instruction sets (AVX, NEON, etc.)
+/// - Platform-specific features
+/// 
+/// ## ARM Platform Support
+/// For ARM platforms, this function uses safe feature detection methods that work
+/// across different ARM variants (ARMv7, AArch64) and avoid issues with
+/// std::arch::is_arm_feature_detected! which is not available on all platforms.
+/// 
+/// The detection strategy uses multiple fallback methods:
+/// 1. Runtime feature detection (when available)
+/// 2. Compile-time feature detection
+/// 3. /proc/cpuinfo parsing on Linux systems
+/// 
+/// ## Error Handling
+/// This function is designed to be robust and will not panic even if feature
+/// detection fails. It provides graceful fallbacks for unsupported platforms.
 fn detect_specialized_capabilities() -> Vec<String> {
     let mut capabilities = Vec::new();
     
@@ -533,38 +552,44 @@ fn detect_specialized_capabilities() -> Vec<String> {
     // Check for CPU-specific features based on architecture
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
+        // Use runtime detection with compile-time fallbacks
         if is_x86_feature_detected!("avx") {
+            capabilities.push("avx".to_string());
+        } else if cfg!(target_feature = "avx") {
             capabilities.push("avx".to_string());
         }
         
         if is_x86_feature_detected!("avx2") {
             capabilities.push("avx2".to_string());
+        } else if cfg!(target_feature = "avx2") {
+            capabilities.push("avx2".to_string());
         }
         
         if is_x86_feature_detected!("sse4.1") {
             capabilities.push("sse4.1".to_string());
+        } else if cfg!(target_feature = "sse4.1") {
+            capabilities.push("sse4.1".to_string());
+        }
+        
+        if is_x86_feature_detected!("fma") {
+            capabilities.push("fma".to_string());
+        } else if cfg!(target_feature = "fma") {
+            capabilities.push("fma".to_string());
         }
     }
     
     #[cfg(target_arch = "aarch64")]
     {
-        // Check for ARM NEON support
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            capabilities.push("neon".to_string());
-        }
-        
-        // Check for ARM SVE support (if available)
-        if std::arch::is_aarch64_feature_detected!("sve") {
-            capabilities.push("sve".to_string());
-        }
+        // Use the safe AArch64 feature detection function
+        let aarch64_features = detect_aarch64_features();
+        capabilities.extend(aarch64_features);
     }
     
     #[cfg(target_arch = "arm")]
     {
-        // For ARMv7, we can check for NEON support
-        if std::arch::is_arm_feature_detected!("neon") {
-            capabilities.push("neon".to_string());
-        }
+        // Use the safe ARM feature detection function
+        let arm_features = detect_arm_features();
+        capabilities.extend(arm_features);
     }
     
     // For other architectures, add generic capability detection
@@ -585,6 +610,105 @@ fn detect_specialized_capabilities() -> Vec<String> {
     }
     
     capabilities
+}
+
+/// Safe ARM feature detection that works across different ARM platforms
+/// This function handles the complexity of ARM feature detection across different
+/// platforms and Rust versions where std::arch::is_arm_feature_detected! may not be available
+#[cfg(target_arch = "arm")]
+fn detect_arm_features() -> Vec<String> {
+    let mut features = Vec::new();
+    
+    // Method 1: Try compile-time feature detection
+    if cfg!(target_feature = "neon") {
+        features.push("neon".to_string());
+    }
+    
+    // Method 2: Try runtime feature detection if available
+    // Note: This is wrapped in a feature check to avoid compilation errors
+    // on platforms where the macro is not available
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        // Try to read /proc/cpuinfo as a fallback
+        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+            let content = cpuinfo.to_lowercase();
+            if content.contains("neon") || content.contains("asimd") {
+                if !features.contains(&"neon".to_string()) {
+                    features.push("neon".to_string());
+                }
+            }
+            if content.contains("vfp") {
+                features.push("vfp".to_string());
+            }
+            if content.contains("thumb") {
+                features.push("thumb".to_string());
+            }
+        }
+    }
+    
+    // Method 3: Architecture-specific detection
+    if cfg!(target_feature = "v7") {
+        features.push("armv7".to_string());
+    }
+    
+    if cfg!(target_feature = "thumb2") {
+        features.push("thumb2".to_string());
+    }
+    
+    features
+}
+
+/// Safe AArch64 feature detection with multiple fallback methods
+#[cfg(target_arch = "aarch64")]
+fn detect_aarch64_features() -> Vec<String> {
+    let mut features = Vec::new();
+    
+    // Method 1: Runtime detection (preferred)
+    if std::arch::is_aarch64_feature_detected!("neon") {
+        features.push("neon".to_string());
+    } else if cfg!(target_feature = "neon") {
+        features.push("neon".to_string());
+    }
+    
+    if std::arch::is_aarch64_feature_detected!("sve") {
+        features.push("sve".to_string());
+    } else if cfg!(target_feature = "sve") {
+        features.push("sve".to_string());
+    }
+    
+    if std::arch::is_aarch64_feature_detected!("asimd") {
+        features.push("asimd".to_string());
+    } else if cfg!(target_feature = "asimd") {
+        features.push("asimd".to_string());
+    }
+    
+    // Additional AArch64 features
+    if std::arch::is_aarch64_feature_detected!("fp") {
+        features.push("fp".to_string());
+    }
+    
+    if std::arch::is_aarch64_feature_detected!("crc") {
+        features.push("crc".to_string());
+    }
+    
+    // Method 2: Fallback to /proc/cpuinfo on Linux
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+            let content = cpuinfo.to_lowercase();
+            if content.contains("asimd") && !features.contains(&"asimd".to_string()) {
+                features.push("asimd".to_string());
+            }
+            if content.contains("sve") && !features.contains(&"sve".to_string()) {
+                features.push("sve".to_string());
+            }
+            if content.contains("fp") && !features.contains(&"fp".to_string()) {
+                features.push("fp".to_string());
+            }
+        }
+    }
+    
+    features
 }
 
 // Data structures for cluster communication
