@@ -171,6 +171,7 @@ class DistributedCluster:
             address: Network address of the node
             capabilities: Optional capabilities specification
         """
+        del capabilities  # Unused parameter - will be implemented in future versions
         # TODO: Implement proper node addition with capabilities
         pass
     

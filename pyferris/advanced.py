@@ -271,6 +271,7 @@ class ResultCollector:
         This is a placeholder implementation. In practice, you'd want to
         integrate with concurrent.futures or similar.
         """
+        del timeout  # Unused parameter - will be implemented in future versions
         # This is a simple implementation - in practice you'd want
         # proper integration with concurrent.futures
         for future in futures:

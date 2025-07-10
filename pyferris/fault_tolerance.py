@@ -355,6 +355,7 @@ if __name__ == "__main__":
     # Example 3: Long-running operation with checkpoints
     @with_checkpoints("data_processing", auto_save_interval=60)
     def process_large_dataset(data, _checkpoint_manager=None, _operation_id=None, _initial_state=None):
+        del _checkpoint_manager, _operation_id  # Unused parameters handled by decorator
         # Process data with periodic checkpointing
         processed = 0
         total = len(data)

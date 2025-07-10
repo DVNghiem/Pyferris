@@ -1,8 +1,6 @@
 use pyo3::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
-use std::thread;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use rayon::prelude::*;
 
 /// Work-stealing scheduler for load balancing

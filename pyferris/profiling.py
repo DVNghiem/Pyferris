@@ -223,6 +223,7 @@ class TimerContext:
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
+        del exc_type, exc_val, exc_tb  # Unused parameters
         self.profiler.stop_timer(self.name)
 
 
