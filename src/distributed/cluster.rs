@@ -530,18 +530,48 @@ fn detect_specialized_capabilities() -> Vec<String> {
         capabilities.push("opencl".to_string());
     }
     
-    // Check for AVX support
-    if is_x86_feature_detected!("avx") {
-        capabilities.push("avx".to_string());
+    // Check for CPU-specific features based on architecture
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx") {
+            capabilities.push("avx".to_string());
+        }
+        
+        if is_x86_feature_detected!("avx2") {
+            capabilities.push("avx2".to_string());
+        }
+        
+        if is_x86_feature_detected!("sse4.1") {
+            capabilities.push("sse4.1".to_string());
+        }
     }
     
-    if is_x86_feature_detected!("avx2") {
-        capabilities.push("avx2".to_string());
+    #[cfg(target_arch = "aarch64")]
+    {
+        // Check for ARM NEON support
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            capabilities.push("neon".to_string());
+        }
+        
+        // Check for ARM SVE support (if available)
+        if std::arch::is_aarch64_feature_detected!("sve") {
+            capabilities.push("sve".to_string());
+        }
     }
     
-    // Check for SSE support
-    if is_x86_feature_detected!("sse4.1") {
-        capabilities.push("sse4.1".to_string());
+    #[cfg(target_arch = "arm")]
+    {
+        // For ARMv7, we can check for NEON support
+        if std::arch::is_arm_feature_detected!("neon") {
+            capabilities.push("neon".to_string());
+        }
+    }
+    
+    // For other architectures, add generic capability detection
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64", target_arch = "arm")))]
+    {
+        // Add generic capabilities for other architectures
+        capabilities.push("generic".to_string());
     }
     
     // Check for high core count (> 16 cores)
