@@ -30,6 +30,7 @@ mod memory;
 mod profiling;
 mod distributed;
 mod fault_tolerance;
+mod cache;
 
 use core::*;
 use executor::*;
@@ -46,6 +47,7 @@ use memory::*;
 use profiling::*;
 use distributed::*;
 use fault_tolerance::*;
+use cache::*;
 
 /// Pyferris Rust Extensions
 /// High-performance Rust implementations
@@ -129,6 +131,10 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<LockFreeQueue>()?;
     m.add_class::<AtomicCounter>()?;
     m.add_class::<RwLockDict>()?;
+    
+    // Register Level 4: Smart Cache
+    m.add_class::<SmartCache>()?;
+    m.add_class::<EvictionPolicy>()?;
     
     // Register Level 5: Distributed Processing
     m.add_class::<ClusterManager>()?;

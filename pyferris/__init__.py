@@ -28,6 +28,7 @@ from .scheduler import (
 from .concurrent import ConcurrentHashMap, LockFreeQueue, AtomicCounter, RwLockDict
 from .memory import MemoryPool, memory_mapped_array, memory_mapped_array_2d, memory_mapped_info, create_temp_mmap
 from .profiling import Profiler, auto_tune_workers, profile_parallel_operation
+from .cache import SmartCache, EvictionPolicy, cached
 
 # Level 5: Enterprise Features
 from .distributed import (
@@ -132,6 +133,11 @@ __all__ = [
     "Profiler",
     "auto_tune_workers",
     "profile_parallel_operation",
+    
+    # Level 4: Smart Cache
+    "SmartCache",
+    "EvictionPolicy",
+    "cached",
     
     # Level 5: Distributed Processing
     "DistributedCluster",
