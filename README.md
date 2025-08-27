@@ -2,54 +2,6 @@
 
 **PyFerris** is a high-performance parallel processing library for Python, powered by Rust and PyO3. It provides a seamless, Pythonic API to leverage Rust's speed and memory safety for parallel and distributed computing, bypassing Python's Global Interpreter Lock (GIL). PyFerris is designed for developers and engineers across all fields who need efficient parallel processing for compute-intensive tasks, running anywhere from embedded systems to enterprise-grade applications.
 
-## Key Features
-
-PyFerris offers a comprehensive set of features, from basic parallel operations to advanced distributed processing:
-
-### Level 1: Basic Features
-- **Core Parallel Operations**: `parallel_map`, `parallel_filter`, `parallel_reduce`, `parallel_starmap` for efficient parallel processing.
-- **Task Executor**: A Rayon-powered `Executor` with true parallel computation support, Python callback execution, and configurable performance tuning.
-- **Basic Configuration**: Control number of workers and chunk sizes with `set_worker_count` and `set_chunk_size`.
-- **Error Handling**: Robust error propagation with `ParallelExecutionError` and flexible strategies (`raise`, `ignore`, `collect`).
-
-### Level 2: Intermediate Features
-- **Advanced Parallel Operations**: `parallel_sort`, `parallel_group_by`, `parallel_unique`, `parallel_partition` for complex data processing.
-- **Batch Processing**: Process large datasets in chunks with `BatchProcessor` and `parallel_chunks`.
-- **Result Collection**: Collect results in ordered, unordered, or as-completed modes.
-- **Progress Tracking**: Monitor task progress with `tqdm` integration or custom `ProgressTracker`.
-
-### Level 3: Advanced Features
-- **Pipeline Processing**: Chain operations with `Pipeline` and `Chain` for streamlined data processing.
-- **Async Support**: Asynchronous execution with `AsyncExecutor` for I/O-bound and CPU-bound tasks.
-- **Shared Memory**: Zero-copy data sharing with `SharedArray`, `SharedDict`, `SharedQueue`, and `SharedCounter`.
-- **Custom Schedulers**: Flexible scheduling with `WorkStealingScheduler`, `RoundRobinScheduler`, and `PriorityScheduler`.
-
-### Level 4: Expert Features
-- **Concurrent Data Structures**: Lock-free and thread-safe `ConcurrentHashMap`, `LockFreeQueue`, `AtomicCounter`, and `RwLockDict`.
-- **Memory Management**: Efficient memory usage with `MemoryPool` and `memory_mapped_array`.
-- **Performance Profiling**: Detailed profiling with `Profiler` for CPU, memory, and bottleneck analysis.
-- **Smart Caching**: High-performance `SmartCache` with multiple eviction policies (LRU, LFU, TTL, Adaptive) for immediate performance gains.
-- **Dynamic Load Balancing**: Adaptive scheduling with `AdaptiveScheduler` and `auto_tune_workers`.
-
-### Level 5: Enterprise Features
-- **Distributed Processing**: Multi-machine support with `DistributedExecutor`, `cluster_map`, and `distributed_reduce`.
-- **Fault Tolerance**: Reliable execution with `RetryExecutor` and `CheckpointManager`.
-- **Resource Management**: Fine-grained control with `ResourceManager` and `ResourceMonitor`.
-- **Framework Integrations**: Seamless integration with popular libraries and frameworks.
-- **Advanced Analytics**: Performance analysis with `PerformanceAnalyzer` and metrics export.
-- **Custom Extensions**: Plugin system with `register_custom_operation` and `load_plugin`.
-
-### Additional Features
-- **Cross-Platform Processing**: Run efficiently on any processor architecture and operating system.
-- **Scalable Operations**: From single-core embedded systems to multi-node clusters.
-- **Real-time Processing**: Handle streaming data and real-time computations.
-- **Cloud Integration**: Deploy and scale across cloud platforms and serverless environments.
-- **Interactive Mode**: Jupyter-friendly API with magic commands (`%%parallel_map`) and visual progress.
-- **Auto-Tuning API**: Automatically optimize workers and chunk sizes with `auto_tune`.
-- **Visualization Tools**: Visualize task execution and resource usage with `PerformanceVisualizer`.
-- **Data Security**: Secure processing with encryption and audit capabilities.
-- **Compliance Logging**: Enterprise-ready logging with `set_audit_log`.
-
 ## Installation
 
 PyFerris is available on PyPI and can be installed with `pip` or `poetry`.
