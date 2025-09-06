@@ -7,7 +7,7 @@ use rayon::prelude::*;
 #[pyclass]
 pub struct WorkStealingScheduler {
     workers: usize,
-    work_queues: Arc<Mutex<Vec<VecDeque<Arc<PyObject>>>>>,
+    work_queues: Arc<Mutex<Vec<VecDeque<Arc<Py<PyAny>>>>>>,
 }
 
 #[pymethods]
@@ -25,13 +25,13 @@ impl WorkStealingScheduler {
     }
 
     /// Execute tasks with work-stealing scheduling
-    pub fn execute(&self, py: Python, tasks: Vec<Bound<PyAny>>) -> PyResult<Vec<PyObject>> {
+    pub fn execute(&self, py: Python, tasks: Vec<Bound<PyAny>>) -> PyResult<Vec<Py<PyAny>>> {
         if tasks.is_empty() {
             return Ok(Vec::new());
         }
 
-        let task_objects: Vec<Arc<PyObject>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
-        
+        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+
         // Distribute tasks among work queues
         {
             let mut queues = self.work_queues.lock().unwrap();
@@ -42,10 +42,10 @@ impl WorkStealingScheduler {
         }
 
         // Execute tasks using rayon's work-stealing
-        let results: PyResult<Vec<PyObject>> = py.allow_threads(|| {
+        let results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
             task_objects.par_iter()
                 .map(|task| {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let bound_task = task.bind(py);
                         bound_task.call0().map(|r| r.into())
                     })
@@ -57,20 +57,20 @@ impl WorkStealingScheduler {
     }
 
     /// Execute tasks with custom work distribution
-    pub fn execute_with_distribution(&self, py: Python, tasks: Vec<Bound<PyAny>>, chunk_size: Option<usize>) -> PyResult<Vec<PyObject>> {
+    pub fn execute_with_distribution(&self, py: Python, tasks: Vec<Bound<PyAny>>, chunk_size: Option<usize>) -> PyResult<Vec<Py<PyAny>>> {
         if tasks.is_empty() {
             return Ok(Vec::new());
         }
 
         let chunk_size = chunk_size.unwrap_or(tasks.len() / self.workers.max(1));
-        let task_objects: Vec<Arc<PyObject>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
 
         // Process in chunks with work-stealing
-        let results: PyResult<Vec<PyObject>> = py.allow_threads(|| {
+        let results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
             task_objects.par_chunks(chunk_size)
                 .flat_map(|chunk| {
                     chunk.par_iter().map(|task| {
-                        Python::with_gil(|py| {
+                        Python::attach(|py| {
                             let bound_task = task.bind(py);
                             bound_task.call0().map(|r| r.into())
                         })
@@ -116,27 +116,27 @@ impl RoundRobinScheduler {
     }
 
     /// Execute tasks in round-robin fashion
-    pub fn execute(&self, py: Python, tasks: Vec<Bound<PyAny>>) -> PyResult<Vec<PyObject>> {
+    pub fn execute(&self, py: Python, tasks: Vec<Bound<PyAny>>) -> PyResult<Vec<Py<PyAny>>> {
         if tasks.is_empty() {
             return Ok(Vec::new());
         }
 
-        let task_objects: Vec<Arc<PyObject>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
         
         // Group tasks by worker assignment
-        let mut worker_tasks: Vec<Vec<Arc<PyObject>>> = vec![Vec::new(); self.workers];
+        let mut worker_tasks: Vec<Vec<Arc<Py<PyAny>>>> = vec![Vec::new(); self.workers];
         for (i, task) in task_objects.iter().enumerate() {
             let worker_idx = i % self.workers;
             worker_tasks[worker_idx].push(task.clone());
         }
 
         // Execute tasks in parallel groups
-        let results: PyResult<Vec<Vec<PyObject>>> = py.allow_threads(|| {
+        let results: PyResult<Vec<Vec<Py<PyAny>>>> = py.detach(|| {
             worker_tasks.par_iter()
                 .map(|worker_task_group| {
                     worker_task_group.iter()
                         .map(|task| {
-                            Python::with_gil(|py| {
+                            Python::attach(|py| {
                                 let bound_task = task.bind(py);
                                 bound_task.call0().map(|r| r.into())
                             })
@@ -201,7 +201,7 @@ impl AdaptiveScheduler {
     }
 
     /// Execute tasks with adaptive worker count
-    pub fn execute(&self, py: Python, tasks: Vec<Bound<PyAny>>) -> PyResult<Vec<PyObject>> {
+    pub fn execute(&self, py: Python, tasks: Vec<Bound<PyAny>>) -> PyResult<Vec<Py<PyAny>>> {
         if tasks.is_empty() {
             return Ok(Vec::new());
         }
@@ -215,16 +215,16 @@ impl AdaptiveScheduler {
 
         // Store length before consuming tasks
         let task_count = tasks.len();
-        let task_objects: Vec<Arc<PyObject>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
         
         // Use dynamic chunk size based on worker count and task size
         let chunk_size = (task_count / optimal_workers).max(1);
 
-        let results: PyResult<Vec<PyObject>> = py.allow_threads(|| {
+        let results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
             task_objects.par_chunks(chunk_size)
                 .flat_map(|chunk| {
                     chunk.par_iter().map(|task| {
-                        Python::with_gil(|py| {
+                        Python::attach(|py| {
                             let bound_task = task.bind(py);
                             bound_task.call0().map(|r| r.into())
                         })

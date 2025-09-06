@@ -1,10 +1,10 @@
+use crate::error::ParallelExecutionError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList, PyString};
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
-use rayon::prelude::*;
-use crate::error::ParallelExecutionError;
 
 /// High-performance file reader with parallel processing capabilities
 #[pyclass]
@@ -27,15 +27,15 @@ impl FileReader {
     }
 
     /// Read entire file as bytes
-    pub fn read_bytes(&self) -> PyResult<Py<PyBytes>> {
+    pub fn read_bytes(&self, py: Python) -> PyResult<Py<PyBytes>> {
         let mut file = File::open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
-        
+
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
 
-        Python::with_gil(|py| Ok(PyBytes::new(py, &buffer).into()))
+        Ok(PyBytes::new(py, &buffer).into())
     }
 
     /// Read entire file as string
@@ -45,51 +45,50 @@ impl FileReader {
     }
 
     /// Read file line by line
-    pub fn read_lines(&self) -> PyResult<Py<PyList>> {
+    pub fn read_lines(&self, py: Python) -> PyResult<Py<PyList>> {
         let file = File::open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
-        
+
         let reader = BufReader::new(file);
         let lines: Result<Vec<String>, _> = reader.lines().collect();
         let lines = lines
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read lines: {}", e)))?;
 
-        Python::with_gil(|py| {
-            let py_lines = PyList::empty(py);
-            for line in lines {
-                py_lines.append(PyString::new(py, &line))?;
-            }
-            Ok(py_lines.into())
-        })
+        let py_lines = PyList::empty(py);
+        for line in lines {
+            py_lines.append(PyString::new(py, &line))?;
+        }
+        Ok(py_lines.into())
     }
 
     /// Read file in chunks for memory-efficient processing
     pub fn read_chunks(&self) -> PyResult<Vec<Vec<u8>>> {
         let mut file = File::open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
-        
+
         let mut chunks = Vec::new();
         let mut buffer = vec![0; self.chunk_size];
-        
+
         loop {
-            let bytes_read = file.read(&mut buffer)
-                .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read chunk: {}", e)))?;
-            
+            let bytes_read = file.read(&mut buffer).map_err(|e| {
+                ParallelExecutionError::new_err(format!("Failed to read chunk: {}", e))
+            })?;
+
             if bytes_read == 0 {
                 break;
             }
-            
+
             chunks.push(buffer[..bytes_read].to_vec());
         }
-        
+
         Ok(chunks)
     }
 
     /// Parallel line processing with custom function
-    pub fn parallel_process_lines(&self, py: Python, func: PyObject) -> PyResult<Py<PyList>> {
+    pub fn parallel_process_lines(&self, py: Python, func: Py<PyAny>) -> PyResult<Py<PyList>> {
         let file = File::open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
-        
+
         let reader = BufReader::new(file);
         let lines: Result<Vec<String>, _> = reader.lines().collect();
         let lines = lines
@@ -98,21 +97,22 @@ impl FileReader {
         let results: Result<Vec<_>, _> = lines
             .par_iter()
             .map(|line| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let py_line = PyString::new(py, line);
                     func.call1(py, (py_line,))
                 })
             })
             .collect();
 
-        let results = results
-            .map_err(|e| ParallelExecutionError::new_err(format!("Error in parallel processing: {}", e)))?;
+        let results = results.map_err(|e| {
+            ParallelExecutionError::new_err(format!("Error in parallel processing: {}", e))
+        })?;
 
         let py_results = PyList::empty(py);
         for result in results {
             py_results.append(result)?;
         }
-        
+
         Ok(py_results.into())
     }
 }
@@ -129,7 +129,7 @@ pub fn read_file_text(file_path: &str) -> PyResult<String> {
 pub fn read_file_bytes(py: Python, file_path: &str) -> PyResult<Py<PyBytes>> {
     let content = std::fs::read(file_path)
         .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
-    
+
     Ok(PyBytes::new(py, &content).into())
 }
 
@@ -139,19 +139,17 @@ pub fn parallel_read_files(py: Python, file_paths: Vec<String>) -> PyResult<Py<P
     let results: Result<Vec<_>, _> = file_paths
         .par_iter()
         .map(|path| {
-            std::fs::read_to_string(path)
-                .map_err(|e| format!("Failed to read {}: {}", path, e))
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path, e))
         })
         .collect();
 
-    let results = results
-        .map_err(|e| ParallelExecutionError::new_err(e))?;
+    let results = results.map_err(|e| ParallelExecutionError::new_err(e))?;
 
     let py_results = PyList::empty(py);
     for result in results {
         py_results.append(PyString::new(py, &result))?;
     }
-    
+
     Ok(py_results.into())
 }
 
@@ -164,8 +162,9 @@ pub fn file_exists(file_path: &str) -> bool {
 /// Get file size in bytes
 #[pyfunction]
 pub fn get_file_size(file_path: &str) -> PyResult<u64> {
-    let metadata = std::fs::metadata(file_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to get file metadata: {}", e)))?;
-    
+    let metadata = std::fs::metadata(file_path).map_err(|e| {
+        ParallelExecutionError::new_err(format!("Failed to get file metadata: {}", e))
+    })?;
+
     Ok(metadata.len())
 }

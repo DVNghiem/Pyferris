@@ -59,15 +59,13 @@ class AsyncExecutor:
         """
         return self._executor.map_async(func, data)
     
-    def map_async_limited(self, func: Callable[[Any], Any], data: List[Any], 
-                         max_concurrent: int) -> List[Any]:
+    def map_async_limited(self, func: Callable[[Any], Any], data: List[Any]) -> List[Any]:
         """
         Apply a function to data with limited concurrency.
         
         Args:
             func: A function to apply to each element.
             data: A list of input data.
-            max_concurrent: Maximum number of concurrent executions.
         
         Returns:
             A list of results in the same order as input data.
@@ -78,14 +76,13 @@ class AsyncExecutor:
             >>> results = executor.map_async_limited(
             ...     lambda x: expensive_operation(x), 
             ...     large_dataset, 
-            ...     max_concurrent=3
             ... )
         
         Note:
             This is useful when you want to limit resource usage or
             respect rate limits on external services.
         """
-        return self._executor.map_async_limited(func, data, max_concurrent)
+        return self._executor.map_async_limited(func, data)
     
     def submit_task(self, func: Callable[[], Any]) -> 'AsyncTask':
         """
@@ -152,8 +149,7 @@ class AsyncTask:
         return self._task.is_ready()
 
 
-def async_parallel_map(func: Callable[[Any], Any], data: List[Any], 
-                      max_concurrent: Optional[int] = None) -> List[Any]:
+def async_parallel_map(func: Callable[[Any], Any], data: List[Any]) -> List[Any]:
     """
     Apply a function to data using asynchronous parallel processing.
     
@@ -162,8 +158,6 @@ def async_parallel_map(func: Callable[[Any], Any], data: List[Any],
     Args:
         func: A function to apply to each element.
         data: A list of input data.
-        max_concurrent: Maximum number of concurrent executions. 
-                       If None, uses system default.
     
     Returns:
         A list of results in the same order as input data.
@@ -174,17 +168,13 @@ def async_parallel_map(func: Callable[[Any], Any], data: List[Any],
         ...     return x * 2
         >>> 
         >>> data = list(range(20))
-        >>> results = async_parallel_map(slow_operation, data, max_concurrent=5)
+        >>> results = async_parallel_map(slow_operation, data)
         >>> print(results)  # [0, 2, 4, 6, 8, ..., 38]
     """
-    if max_concurrent is None:
-        return _async_parallel_map(func, data)
-    else:
-        return _async_parallel_map(func, data, max_concurrent)
+    return _async_parallel_map(func, data)
 
 
-def async_parallel_filter(predicate: Callable[[Any], bool], data: List[Any], 
-                         max_concurrent: Optional[int] = None) -> List[Any]:
+def async_parallel_filter(predicate: Callable[[Any], bool], data: List[Any]) -> List[Any]:
     """
     Filter data using asynchronous parallel processing.
     
@@ -194,8 +184,6 @@ def async_parallel_filter(predicate: Callable[[Any], bool], data: List[Any],
     Args:
         predicate: A function that returns True/False for each element.
         data: A list of input data to filter.
-        max_concurrent: Maximum number of concurrent executions.
-                       If None, uses system default.
     
     Returns:
         A list containing only elements that satisfy the predicate.
@@ -212,13 +200,9 @@ def async_parallel_filter(predicate: Callable[[Any], bool], data: List[Any],
         ...     return True
         >>> 
         >>> numbers = list(range(2, 100))
-        >>> primes = async_parallel_filter(is_prime_slow, numbers, max_concurrent=8)
+        >>> primes = async_parallel_filter(is_prime_slow, numbers)
         >>> print(f"Found {len(primes)} prime numbers")
     """
-    if max_concurrent is None:
-        return _async_parallel_filter(predicate, data)
-    else:
-        return _async_parallel_filter(predicate, data, max_concurrent)
-
+    return _async_parallel_filter(predicate, data)
 
 __all__ = ['AsyncExecutor', 'AsyncTask', 'async_parallel_map', 'async_parallel_filter']

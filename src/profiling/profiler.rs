@@ -95,7 +95,7 @@ impl Profiler {
     }
 
     /// Get timing results
-    pub fn get_timings(&self, py: Python) -> PyResult<PyObject> {
+    pub fn get_timings(&self, py: Python) -> PyResult<Py<PyAny>> {
         let timings = self.timings.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
         })?;
@@ -110,7 +110,7 @@ impl Profiler {
     }
 
     /// Get memory usage results
-    pub fn get_memory_usage(&self, py: Python) -> PyResult<PyObject> {
+    pub fn get_memory_usage(&self, py: Python) -> PyResult<Py<PyAny>> {
         let memory = self.memory_usage.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
         })?;
@@ -123,7 +123,7 @@ impl Profiler {
     }
 
     /// Get counter results
-    pub fn get_counters(&self, py: Python) -> PyResult<PyObject> {
+    pub fn get_counters(&self, py: Python) -> PyResult<Py<PyAny>> {
         let counters = self.counters.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
         })?;
@@ -136,7 +136,7 @@ impl Profiler {
     }
 
     /// Get comprehensive profiling report
-    pub fn get_report(&self, py: Python) -> PyResult<PyObject> {
+    pub fn get_report(&self, py: Python) -> PyResult<Py<PyAny>> {
         let dict = pyo3::types::PyDict::new(py);
         dict.set_item("timings", self.get_timings(py)?)?;
         dict.set_item("memory_usage", self.get_memory_usage(py)?)?;
@@ -194,12 +194,12 @@ impl Profiler {
 #[pyfunction]
 pub fn auto_tune_workers(
     py: Python,
-    task_function: PyObject,
-    sample_data: Vec<PyObject>,
+    task_function: Py<PyAny>,
+    sample_data: Vec<Py<PyAny>>,
     min_workers: Option<usize>,
     max_workers: Option<usize>,
     test_duration: Option<f64>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let min_w = min_workers.unwrap_or(1);
     let max_w = max_workers.unwrap_or(num_cpus::get());
     let duration_secs = test_duration.unwrap_or(1.0);

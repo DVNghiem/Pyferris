@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
-use std::sync::{Arc, RwLock, Mutex};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Shared array for zero-copy data sharing between threads (Float64 type)
 #[pyclass]
@@ -27,7 +27,7 @@ pub struct SharedArrayStr {
 /// Shared array for generic Python objects
 #[pyclass]
 pub struct SharedArrayObj {
-    data: Arc<RwLock<Vec<PyObject>>>,
+    data: Arc<RwLock<Vec<Py<PyAny>>>>,
     capacity: usize,
 }
 
@@ -55,27 +55,43 @@ impl SharedArray {
     /// Get length of the array
     #[getter]
     pub fn len(&self) -> PyResult<usize> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.len())
     }
 
     /// Check if array is empty
     pub fn is_empty(&self) -> PyResult<bool> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.is_empty())
     }
 
     /// Get item at index
     pub fn get(&self, index: usize) -> PyResult<f64> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        data.get(index).copied().ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        data.get(index)
+            .copied()
+            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
     }
 
     /// Set item at index
     pub fn set(&self, index: usize, value: f64) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if index >= data.len() {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Index out of bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Index out of bounds",
+            ));
         }
         data[index] = value;
         Ok(())
@@ -83,9 +99,14 @@ impl SharedArray {
 
     /// Append item to array
     pub fn append(&self, value: f64) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() >= self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Array at capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Array at capacity",
+            ));
         }
         data.push(value);
         Ok(())
@@ -93,9 +114,14 @@ impl SharedArray {
 
     /// Extend array with multiple values
     pub fn extend(&self, values: Vec<f64>) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() + values.len() > self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Not enough capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Not enough capacity",
+            ));
         }
         data.extend(values);
         Ok(())
@@ -103,23 +129,34 @@ impl SharedArray {
 
     /// Clear the array
     pub fn clear(&self) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         data.clear();
         Ok(())
     }
 
     /// Get a copy of all data
     pub fn to_list(&self) -> PyResult<Vec<f64>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.clone())
     }
 
     /// Get slice of data
     pub fn slice(&self, start: usize, end: Option<usize>) -> PyResult<Vec<f64>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         let end = end.unwrap_or(data.len());
         if start > data.len() || end > data.len() || start > end {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Invalid slice bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Invalid slice bounds",
+            ));
         }
         Ok(data[start..end].to_vec())
     }
@@ -127,21 +164,28 @@ impl SharedArray {
     /// Parallel sum of all elements
     pub fn sum(&self) -> PyResult<f64> {
         use rayon::prelude::*;
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.par_iter().sum())
     }
 
     /// Parallel map operation (simplified to avoid threading issues)
-    pub fn parallel_map(&self, py: Python, func: Bound<PyAny>) -> PyResult<Vec<f64>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        
-        let results: PyResult<Vec<f64>> = data.iter()
+    pub fn parallel_map(&self, func: Bound<PyAny>) -> PyResult<Vec<f64>> {
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+        let results: PyResult<Vec<f64>> = data
+            .iter()
             .map(|&value| {
                 let result = func.call1((value,))?;
                 result.extract::<f64>()
             })
             .collect();
-        
+
         results
     }
 }
@@ -171,27 +215,43 @@ impl SharedArrayInt {
     /// Get length of the array
     #[getter]
     pub fn len(&self) -> PyResult<usize> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.len())
     }
 
     /// Check if array is empty
     pub fn is_empty(&self) -> PyResult<bool> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.is_empty())
     }
 
     /// Get item at index
     pub fn get(&self, index: usize) -> PyResult<i64> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        data.get(index).copied().ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        data.get(index)
+            .copied()
+            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
     }
 
     /// Set item at index
     pub fn set(&self, index: usize, value: i64) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if index >= data.len() {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Index out of bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Index out of bounds",
+            ));
         }
         data[index] = value;
         Ok(())
@@ -199,9 +259,14 @@ impl SharedArrayInt {
 
     /// Append item to array
     pub fn append(&self, value: i64) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() >= self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Array at capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Array at capacity",
+            ));
         }
         data.push(value);
         Ok(())
@@ -209,9 +274,14 @@ impl SharedArrayInt {
 
     /// Extend array with multiple values
     pub fn extend(&self, values: Vec<i64>) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() + values.len() > self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Not enough capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Not enough capacity",
+            ));
         }
         data.extend(values);
         Ok(())
@@ -219,23 +289,34 @@ impl SharedArrayInt {
 
     /// Clear the array
     pub fn clear(&self) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         data.clear();
         Ok(())
     }
 
     /// Get a copy of all data
     pub fn to_list(&self) -> PyResult<Vec<i64>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.clone())
     }
 
     /// Get slice of data
     pub fn slice(&self, start: usize, end: Option<usize>) -> PyResult<Vec<i64>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         let end = end.unwrap_or(data.len());
         if start > data.len() || end > data.len() || start > end {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Invalid slice bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Invalid slice bounds",
+            ));
         }
         Ok(data[start..end].to_vec())
     }
@@ -243,21 +324,28 @@ impl SharedArrayInt {
     /// Parallel sum of all elements
     pub fn sum(&self) -> PyResult<i64> {
         use rayon::prelude::*;
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.par_iter().sum())
     }
 
     /// Parallel map operation
     pub fn parallel_map(&self, _py: Python, func: Bound<PyAny>) -> PyResult<Vec<i64>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        
-        let results: PyResult<Vec<i64>> = data.iter()
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+        let results: PyResult<Vec<i64>> = data
+            .iter()
             .map(|&value| {
                 let result = func.call1((value,))?;
                 result.extract::<i64>()
             })
             .collect();
-        
+
         results
     }
 }
@@ -287,27 +375,43 @@ impl SharedArrayStr {
     /// Get length of the array
     #[getter]
     pub fn len(&self) -> PyResult<usize> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.len())
     }
 
     /// Check if array is empty
     pub fn is_empty(&self) -> PyResult<bool> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.is_empty())
     }
 
     /// Get item at index
     pub fn get(&self, index: usize) -> PyResult<String> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        data.get(index).cloned().ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        data.get(index)
+            .cloned()
+            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
     }
 
     /// Set item at index
     pub fn set(&self, index: usize, value: String) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if index >= data.len() {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Index out of bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Index out of bounds",
+            ));
         }
         data[index] = value;
         Ok(())
@@ -315,9 +419,14 @@ impl SharedArrayStr {
 
     /// Append item to array
     pub fn append(&self, value: String) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() >= self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Array at capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Array at capacity",
+            ));
         }
         data.push(value);
         Ok(())
@@ -325,9 +434,14 @@ impl SharedArrayStr {
 
     /// Extend array with multiple values
     pub fn extend(&self, values: Vec<String>) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() + values.len() > self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Not enough capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Not enough capacity",
+            ));
         }
         data.extend(values);
         Ok(())
@@ -335,38 +449,53 @@ impl SharedArrayStr {
 
     /// Clear the array
     pub fn clear(&self) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         data.clear();
         Ok(())
     }
 
     /// Get a copy of all data
     pub fn to_list(&self) -> PyResult<Vec<String>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.clone())
     }
 
     /// Get slice of data
     pub fn slice(&self, start: usize, end: Option<usize>) -> PyResult<Vec<String>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         let end = end.unwrap_or(data.len());
         if start > data.len() || end > data.len() || start > end {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Invalid slice bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Invalid slice bounds",
+            ));
         }
         Ok(data[start..end].to_vec())
     }
 
     /// Parallel map operation
     pub fn parallel_map(&self, _py: Python, func: Bound<PyAny>) -> PyResult<Vec<String>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        
-        let results: PyResult<Vec<String>> = data.iter()
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+        let results: PyResult<Vec<String>> = data
+            .iter()
             .map(|value| {
                 let result = func.call1((value,))?;
                 result.extract::<String>()
             })
             .collect();
-        
+
         results
     }
 }
@@ -385,9 +514,9 @@ impl SharedArrayObj {
 
     /// Create from existing data
     #[classmethod]
-    pub fn from_data(_cls: &Bound<'_, pyo3::types::PyType>, py: Python, data: Vec<Bound<PyAny>>) -> Self {
+    pub fn from_data(_cls: &Bound<'_, pyo3::types::PyType>, data: Vec<Bound<PyAny>>) -> Self {
         let capacity = std::cmp::max(data.len() * 3 / 2, data.len() + 10); // 50% more or at least +10
-        let objects: Vec<PyObject> = data.into_iter().map(|obj| obj.into()).collect();
+        let objects: Vec<Py<PyAny>> = data.into_iter().map(|obj| obj.into()).collect();
         Self {
             data: Arc::new(RwLock::new(objects)),
             capacity,
@@ -397,47 +526,73 @@ impl SharedArrayObj {
     /// Get length of the array
     #[getter]
     pub fn len(&self) -> PyResult<usize> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.len())
     }
 
     /// Check if array is empty
     pub fn is_empty(&self) -> PyResult<bool> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.is_empty())
     }
 
     /// Get item at index
-    pub fn get(&self, py: Python, index: usize) -> PyResult<PyObject> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        data.get(index).map(|obj| obj.clone_ref(py)).ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
+    pub fn get(&self, py: Python, index: usize) -> PyResult<Py<PyAny>> {
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        data.get(index)
+            .map(|obj| obj.clone_ref(py))
+            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Index out of bounds"))
     }
 
     /// Set item at index
-    pub fn set(&self, py: Python, index: usize, value: Bound<PyAny>) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+    pub fn set(&self, index: usize, value: Bound<PyAny>) -> PyResult<()> {
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if index >= data.len() {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Index out of bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Index out of bounds",
+            ));
         }
         data[index] = value.into();
         Ok(())
     }
 
     /// Append item to array
-    pub fn append(&self, py: Python, value: Bound<PyAny>) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+    pub fn append(&self, value: Bound<PyAny>) -> PyResult<()> {
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() >= self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Array at capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Array at capacity",
+            ));
         }
         data.push(value.into());
         Ok(())
     }
 
     /// Extend array with multiple values
-    pub fn extend(&self, py: Python, values: Vec<Bound<PyAny>>) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+    pub fn extend(&self, values: Vec<Bound<PyAny>>) -> PyResult<()> {
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         if data.len() + values.len() > self.capacity {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("Not enough capacity"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Not enough capacity",
+            ));
         }
         data.extend(values.into_iter().map(|obj| obj.into()));
         Ok(())
@@ -445,39 +600,57 @@ impl SharedArrayObj {
 
     /// Clear the array
     pub fn clear(&self) -> PyResult<()> {
-        let mut data = self.data.write().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut data = self
+            .data
+            .write()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         data.clear();
         Ok(())
     }
 
     /// Get a copy of all data
-    pub fn to_list(&self, py: Python) -> PyResult<Vec<PyObject>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+    pub fn to_list(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(data.iter().map(|obj| obj.clone_ref(py)).collect())
     }
 
     /// Get slice of data
-    pub fn slice(&self, py: Python, start: usize, end: Option<usize>) -> PyResult<Vec<PyObject>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+    pub fn slice(&self, py: Python, start: usize, end: Option<usize>) -> PyResult<Vec<Py<PyAny>>> {
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         let end = end.unwrap_or(data.len());
         if start > data.len() || end > data.len() || start > end {
-            return Err(pyo3::exceptions::PyIndexError::new_err("Invalid slice bounds"));
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "Invalid slice bounds",
+            ));
         }
-        Ok(data[start..end].iter().map(|obj| obj.clone_ref(py)).collect())
+        Ok(data[start..end]
+            .iter()
+            .map(|obj| obj.clone_ref(py))
+            .collect())
     }
 
     /// Parallel map operation
-    pub fn parallel_map(&self, py: Python, func: Bound<PyAny>) -> PyResult<Vec<PyObject>> {
-        let data = self.data.read().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        
-        let results: PyResult<Vec<PyObject>> = data.iter()
+    pub fn parallel_map(&self, py: Python, func: Bound<PyAny>) -> PyResult<Vec<Py<PyAny>>> {
+        let data = self
+            .data
+            .read()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+        let results: PyResult<Vec<Py<PyAny>>> = data
+            .iter()
             .map(|value| {
                 let bound_value = value.bind(py);
                 let result = func.call1((bound_value,))?;
                 Ok(result.into())
             })
             .collect();
-        
+
         results
     }
 }
@@ -485,7 +658,7 @@ impl SharedArrayObj {
 /// Shared queue for thread-safe message passing
 #[pyclass]
 pub struct SharedQueue {
-    data: Arc<Mutex<VecDeque<PyObject>>>,
+    data: Arc<Mutex<VecDeque<Py<PyAny>>>>,
     max_size: Option<usize>,
 }
 
@@ -501,48 +674,68 @@ impl SharedQueue {
     }
 
     /// Put an item in the queue
-    pub fn put(&self, py: Python, item: Bound<PyAny>) -> PyResult<()> {
-        let mut queue = self.data.lock().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        
+    pub fn put(&self, item: Bound<PyAny>) -> PyResult<()> {
+        let mut queue = self
+            .data
+            .lock()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
         if let Some(max_size) = self.max_size {
             if queue.len() >= max_size {
                 return Err(pyo3::exceptions::PyRuntimeError::new_err("Queue is full"));
             }
         }
-        
+
         queue.push_back(item.into());
         Ok(())
     }
 
     /// Get an item from the queue (blocks if empty)
-    pub fn get(&self, py: Python) -> PyResult<PyObject> {
-        let mut queue = self.data.lock().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
-        
-        queue.pop_front().ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Queue is empty"))
+    pub fn get(&self) -> PyResult<Py<PyAny>> {
+        let mut queue = self
+            .data
+            .lock()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+
+        queue
+            .pop_front()
+            .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Queue is empty"))
     }
 
     /// Try to get an item without blocking
-    pub fn get_nowait(&self, py: Python) -> PyResult<Option<PyObject>> {
-        let mut queue = self.data.lock().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+    pub fn get_nowait(&self) -> PyResult<Option<Py<PyAny>>> {
+        let mut queue = self
+            .data
+            .lock()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(queue.pop_front())
     }
 
     /// Check if queue is empty
     pub fn empty(&self) -> PyResult<bool> {
-        let queue = self.data.lock().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let queue = self
+            .data
+            .lock()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(queue.is_empty())
     }
 
     /// Get queue size
     #[getter]
     pub fn size(&self) -> PyResult<usize> {
-        let queue = self.data.lock().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let queue = self
+            .data
+            .lock()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         Ok(queue.len())
     }
 
     /// Clear the queue
     pub fn clear(&self) -> PyResult<()> {
-        let mut queue = self.data.lock().map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
+        let mut queue = self
+            .data
+            .lock()
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Lock error: {}", e)))?;
         queue.clear();
         Ok(())
     }
@@ -597,7 +790,10 @@ impl SharedCounter {
 
     /// Compare and swap
     pub fn compare_and_swap(&self, current: usize, new: usize) -> usize {
-        match self.value.compare_exchange(current, new, Ordering::SeqCst, Ordering::SeqCst) {
+        match self
+            .value
+            .compare_exchange(current, new, Ordering::SeqCst, Ordering::SeqCst)
+        {
             Ok(old_value) => old_value,
             Err(actual_current) => actual_current,
         }
@@ -611,10 +807,10 @@ impl SharedCounter {
 
 /// Factory function to create appropriate SharedArray based on data type
 #[pyfunction]
-pub fn create_shared_array(py: Python, data: Bound<PyAny>) -> PyResult<PyObject> {
+pub fn create_shared_array(py: Python, data: Bound<PyAny>) -> PyResult<Py<PyAny>> {
     // Try to extract as different types and create appropriate array
     // Order matters: check for more specific types first
-    
+
     // Try as list of integers first (before f64 since integers can be converted to f64)
     if let Ok(int_data) = data.extract::<Vec<i64>>() {
         let capacity = std::cmp::max(int_data.len() * 3 / 2, int_data.len() + 10); // 50% more or at least +10
@@ -624,7 +820,7 @@ pub fn create_shared_array(py: Python, data: Bound<PyAny>) -> PyResult<PyObject>
         };
         return Ok(Py::new(py, array)?.into());
     }
-    
+
     // Try as list of floats
     if let Ok(float_data) = data.extract::<Vec<f64>>() {
         let capacity = std::cmp::max(float_data.len() * 3 / 2, float_data.len() + 10); // 50% more or at least +10
@@ -634,7 +830,7 @@ pub fn create_shared_array(py: Python, data: Bound<PyAny>) -> PyResult<PyObject>
         };
         return Ok(Py::new(py, array)?.into());
     }
-    
+
     // Try as list of strings
     if let Ok(str_data) = data.extract::<Vec<String>>() {
         let capacity = std::cmp::max(str_data.len() * 3 / 2, str_data.len() + 10); // 50% more or at least +10
@@ -644,10 +840,10 @@ pub fn create_shared_array(py: Python, data: Bound<PyAny>) -> PyResult<PyObject>
         };
         return Ok(Py::new(py, array)?.into());
     }
-    
+
     // Fall back to generic object array
     if let Ok(list) = data.downcast::<pyo3::types::PyList>() {
-        let obj_data: Vec<PyObject> = list.iter().map(|obj| obj.into()).collect();
+        let obj_data: Vec<Py<PyAny>> = list.iter().map(|obj| obj.into()).collect();
         let capacity = std::cmp::max(list.len() * 3 / 2, list.len() + 10); // 50% more or at least +10
         let array = SharedArrayObj {
             data: Arc::new(RwLock::new(obj_data)),
@@ -655,6 +851,8 @@ pub fn create_shared_array(py: Python, data: Bound<PyAny>) -> PyResult<PyObject>
         };
         return Ok(Py::new(py, array)?.into());
     }
-    
-    Err(pyo3::exceptions::PyTypeError::new_err("Unsupported data type for SharedArray creation"))
+
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "Unsupported data type for SharedArray creation",
+    ))
 }

@@ -7,8 +7,15 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone)]
 pub enum RetryStrategy {
     FixedDelay(Duration),
-    ExponentialBackoff { initial: Duration, max: Duration, multiplier: f64 },
-    LinearBackoff { initial: Duration, increment: Duration },
+    ExponentialBackoff {
+        initial: Duration,
+        max: Duration,
+        multiplier: f64,
+    },
+    LinearBackoff {
+        initial: Duration,
+        increment: Duration,
+    },
 }
 
 /// Retry executor for handling transient failures
@@ -41,7 +48,7 @@ impl RetryExecutor {
         initial_delay: f64,
         max_delay: Option<f64>,
         multiplier: Option<f64>,
-        increment: Option<f64>
+        increment: Option<f64>,
     ) -> Self {
         let strategy = match strategy {
             "exponential" => RetryStrategy::ExponentialBackoff {
@@ -59,7 +66,11 @@ impl RetryExecutor {
         Self {
             strategy,
             max_attempts,
-            exceptions_to_retry: vec!["Exception".to_string(), "RuntimeError".to_string(), "Error".to_string()],
+            exceptions_to_retry: vec![
+                "Exception".to_string(),
+                "RuntimeError".to_string(),
+                "Error".to_string(),
+            ],
             on_retry_callback: None,
         }
     }
@@ -75,31 +86,35 @@ impl RetryExecutor {
     }
 
     /// Execute function with retry logic
-    pub fn execute(&self, py: Python<'_>, function: Bound<'_, PyFunction>, args: Bound<'_, PyTuple>) -> PyResult<PyObject> {
+    pub fn execute(
+        &self,
+        function: Bound<'_, PyFunction>,
+        args: Bound<'_, PyTuple>,
+    ) -> PyResult<Py<PyAny>> {
         let mut last_error: Option<PyErr> = None;
-        
+
         for attempt in 0..self.max_attempts {
             match function.call1(&args) {
                 Ok(result) => return Ok(result.unbind()),
                 Err(err) => {
                     // Check if this exception should trigger a retry
                     let should_retry = self.should_retry_error(&err);
-                    
+
                     if !should_retry || attempt == self.max_attempts - 1 {
                         return Err(err);
                     }
 
                     last_error = Some(err);
-                    
+
                     // Calculate delay for this attempt
                     let delay = self.calculate_delay(attempt);
-                    
+
                     // Call retry callback if set (simplified - just sleep for now)
                     thread::sleep(delay);
                 }
             }
         }
-        
+
         // If we get here, all attempts failed
         Err(last_error.unwrap_or_else(|| {
             pyo3::exceptions::PyRuntimeError::new_err("All retry attempts failed")
@@ -119,20 +134,29 @@ impl RetryExecutor {
 impl RetryExecutor {
     fn should_retry_error(&self, error: &PyErr) -> bool {
         // Simple implementation - always retry for demo
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let error_type = error.get_type(py);
-            let error_name = error_type.name().map(|s| s.to_string()).unwrap_or_else(|_| "Unknown".to_string());
-            self.exceptions_to_retry.iter().any(|exc| error_name.contains(exc))
+            let error_name = error_type
+                .name()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|_| "Unknown".to_string());
+            self.exceptions_to_retry
+                .iter()
+                .any(|exc| error_name.contains(exc))
         })
     }
 
     fn calculate_delay(&self, attempt: usize) -> Duration {
         match &self.strategy {
             RetryStrategy::FixedDelay(delay) => *delay,
-            RetryStrategy::ExponentialBackoff { initial, max, multiplier } => {
+            RetryStrategy::ExponentialBackoff {
+                initial,
+                max,
+                multiplier,
+            } => {
                 let delay = initial.as_secs_f64() * multiplier.powi(attempt as i32);
                 Duration::from_secs_f64(delay.min(max.as_secs_f64()))
-            },
+            }
             RetryStrategy::LinearBackoff { initial, increment } => {
                 *initial + *increment * attempt as u32
             }
@@ -172,7 +196,12 @@ impl CircuitBreaker {
     }
 
     /// Execute function with circuit breaker protection
-    pub fn execute(&self, _py: Python<'_>, function: Bound<'_, PyFunction>, args: Bound<'_, PyTuple>) -> PyResult<PyObject> {
+    pub fn execute(
+        &self,
+        _py: Python<'_>,
+        function: Bound<'_, PyFunction>,
+        args: Bound<'_, PyTuple>,
+    ) -> PyResult<Py<PyAny>> {
         // Check current state
         {
             let mut state = self.state.lock().unwrap();
@@ -186,14 +215,14 @@ impl CircuitBreaker {
                             *state = CircuitState::HalfOpen;
                         } else {
                             return Err(pyo3::exceptions::PyRuntimeError::new_err(
-                                "Circuit breaker is open - failing fast"
+                                "Circuit breaker is open - failing fast",
                             ));
                         }
                     }
-                },
+                }
                 CircuitState::HalfOpen => {
                     // Allow limited testing
-                },
+                }
                 CircuitState::Closed => {
                     // Normal operation
                 }
@@ -207,7 +236,7 @@ impl CircuitBreaker {
                 *self.failure_count.lock().unwrap() = 0;
                 *self.state.lock().unwrap() = CircuitState::Closed;
                 Ok(result.unbind())
-            },
+            }
             Err(err) => {
                 // Failure - increment count and potentially open circuit
                 let mut failure_count = self.failure_count.lock().unwrap();
@@ -228,10 +257,10 @@ impl CircuitBreaker {
         let stats = pyo3::types::PyDict::new(py);
         let state = self.state.lock().unwrap();
         let failure_count = *self.failure_count.lock().unwrap();
-        
+
         let state_str = match *state {
             CircuitState::Closed => "closed",
-            CircuitState::Open => "open", 
+            CircuitState::Open => "open",
             CircuitState::HalfOpen => "half_open",
         };
 

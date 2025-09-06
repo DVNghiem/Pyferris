@@ -12,8 +12,8 @@ name = "_pyferris"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "=0.25", features = ["extension-module", "generate-import-lib", "experimental-async"] }
-pyo3-async-runtimes = { version = "0.25", features = ["tokio-runtime"] }
+pyo3 = { version = "0.26.0", features = ["extension-module", "generate-import-lib", "experimental-async"] }
+pyo3-async-runtimes = { version = "0.26.0", features = ["tokio-runtime"] }
 tokio = { version = "1.47.1", features = ["full"] }
 mimalloc = { version = "0.1.48", optional = true }
 rayon = "1.11.0"
@@ -23,7 +23,7 @@ serde = { version = "1.0", features = ["derive"] }
 num_cpus = "1.0"
 dashmap = "6.1"
 crossbeam = "0.8"
-uuid = { version = "1.18.0", features = ["v4", "serde"] }
+uuid = { version = "1.18.1", features = ["v4"] }
 # Additional optimization dependencies
 ahash = "0.8"  # Faster hasher
 smallvec = "1.13"  # Stack-allocated vectors for small collections
@@ -37,7 +37,7 @@ tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["
 mimalloc = "0.1.47"
 
 [build-dependencies]
-pyo3-build-config = "=0.25"
+pyo3-build-config = "0.26.0"
 
 [features]
 default = []

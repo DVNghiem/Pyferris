@@ -19,7 +19,7 @@ impl JsonReader {
     }
 
     /// Read JSON file as Python object
-    pub fn read(&self, py: Python) -> PyResult<PyObject> {
+    pub fn read(&self, py: Python) -> PyResult<Py<PyAny>> {
         let file = File::open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open JSON file: {}", e)))?;
 
@@ -91,7 +91,7 @@ impl JsonWriter {
     }
 
     /// Write Python object as JSON
-    pub fn write(&self, py: Python, data: PyObject) -> PyResult<()> {
+    pub fn write(&self, py: Python, data: Py<PyAny>) -> PyResult<()> {
         let json_value = python_to_json_value(py, &data)?;
         
         let file = File::create(&self.file_path)
@@ -133,7 +133,7 @@ impl JsonWriter {
     }
 
     /// Append object to JSON Lines file
-    pub fn append_line(&self, py: Python, data: PyObject) -> PyResult<()> {
+    pub fn append_line(&self, py: Python, data: Py<PyAny>) -> PyResult<()> {
         use std::fs::OpenOptions;
         use std::io::Write;
         
@@ -155,7 +155,7 @@ impl JsonWriter {
 }
 
 /// Convert JSON Value to Python object
-fn json_value_to_python(py: Python, value: &Value) -> PyResult<PyObject> {
+fn json_value_to_python(py: Python, value: &Value) -> PyResult<Py<PyAny>> {
     match value {
         Value::Null => Ok(py.None()),
         Value::Bool(b) => Ok(<pyo3::Bound<'_, PyBool> as Clone>::clone(&PyBool::new(py, *b)).into_any().unbind()),
@@ -189,7 +189,7 @@ fn json_value_to_python(py: Python, value: &Value) -> PyResult<PyObject> {
 }
 
 /// Convert Python object to JSON Value
-fn python_to_json_value(py: Python, obj: &PyObject) -> PyResult<Value> {
+fn python_to_json_value(py: Python, obj: &Py<PyAny>) -> PyResult<Value> {
     if obj.is_none(py) {
         Ok(Value::Null)
     } else if let Ok(b) = obj.extract::<bool>(py) {
@@ -230,14 +230,14 @@ fn python_to_json_value(py: Python, obj: &PyObject) -> PyResult<Value> {
 
 /// Read JSON file as Python object
 #[pyfunction]
-pub fn read_json(py: Python, file_path: &str) -> PyResult<PyObject> {
+pub fn read_json(py: Python, file_path: &str) -> PyResult<Py<PyAny>> {
     let reader = JsonReader::new(file_path.to_string());
     reader.read(py)
 }
 
 /// Write Python object as JSON file
 #[pyfunction]
-pub fn write_json(py: Python, file_path: &str, data: PyObject, pretty_print: Option<bool>) -> PyResult<()> {
+pub fn write_json(py: Python, file_path: &str, data: Py<PyAny>, pretty_print: Option<bool>) -> PyResult<()> {
     let writer = JsonWriter::new(file_path.to_string(), pretty_print.unwrap_or(false));
     writer.write(py, data)
 }
@@ -258,14 +258,14 @@ pub fn write_jsonl(py: Python, file_path: &str, data: &Bound<'_, PyList>) -> PyR
 
 /// Append object to JSON Lines file
 #[pyfunction]
-pub fn append_jsonl(py: Python, file_path: &str, data: PyObject) -> PyResult<()> {
+pub fn append_jsonl(py: Python, file_path: &str, data: Py<PyAny>) -> PyResult<()> {
     let writer = JsonWriter::new(file_path.to_string(), false);
     writer.append_line(py, data)
 }
 
 /// Parse JSON string to Python object
 #[pyfunction]
-pub fn parse_json(py: Python, json_str: &str) -> PyResult<PyObject> {
+pub fn parse_json(py: Python, json_str: &str) -> PyResult<Py<PyAny>> {
     let json_value: Value = serde_json::from_str(json_str)
         .map_err(|e| ParallelExecutionError::new_err(format!("Failed to parse JSON: {}", e)))?;
     
@@ -274,7 +274,7 @@ pub fn parse_json(py: Python, json_str: &str) -> PyResult<PyObject> {
 
 /// Convert Python object to JSON string
 #[pyfunction]
-pub fn to_json_string(py: Python, data: PyObject, pretty_print: Option<bool>) -> PyResult<String> {
+pub fn to_json_string(py: Python, data: Py<PyAny>, pretty_print: Option<bool>) -> PyResult<String> {
     let json_value = python_to_json_value(py, &data)?;
     
     if pretty_print.unwrap_or(false) {

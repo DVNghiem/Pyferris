@@ -12,8 +12,8 @@ pub fn parallel_map(
     iterable: Bound<PyAny>,
     chunk_size: Option<usize>,
 ) -> PyResult<Py<PyList>> {
-    // Convert to PyObjects with optimized allocation
-    let items: Vec<PyObject> = {
+    // Convert to Py<PyAny> with optimized allocation
+    let items: Vec<Py<PyAny>> = {
         let iter = iterable.try_iter()?;
         let mut items = Vec::new();
         
@@ -48,14 +48,14 @@ pub fn parallel_map(
         }
     });
 
-    let func: Arc<PyObject> = Arc::new(func.into());
+    let func: Arc<Py<PyAny>> = Arc::new(func.into());
     
     // Release GIL for parallel processing with optimized error handling
-    let results: Vec<SmallVec<[PyObject; 8]>> = py.allow_threads(|| {
-        let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+    let results: Vec<SmallVec<[Py<PyAny>; 8]>> = py.detach(|| {
+        let chunk_results: PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> = items
             .par_chunks(chunk_size)
             .map(|chunk| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let mut chunk_results = SmallVec::with_capacity(chunk.len());
                     let bound_func = func.bind(py);
                     
@@ -92,8 +92,8 @@ pub fn parallel_starmap(
     iterable: Bound<PyAny>,
     chunk_size: Option<usize>,
 ) -> PyResult<Py<PyList>> {
-    // Convert to PyObjects with optimized allocation
-    let items: Vec<PyObject> = {
+    // Convert to Py<PyAny>s with optimized allocation
+    let items: Vec<Py<PyAny>> = {
         let iter = iterable.try_iter()?;
         let mut items = Vec::new();
         
@@ -128,14 +128,14 @@ pub fn parallel_starmap(
         }
     });
 
-    let func: Arc<PyObject> = Arc::new(func.into());
+    let func: Arc<Py<PyAny>> = Arc::new(func.into());
     
     // Release GIL for parallel processing with optimized error handling
-    let results: Vec<SmallVec<[PyObject; 8]>> = py.allow_threads(|| {
-        let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+    let results: Vec<SmallVec<[Py<PyAny>; 8]>> = py.detach(|| {
+        let chunk_results: PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> = items
             .par_chunks(chunk_size)
             .map(|chunk| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let mut chunk_results = SmallVec::with_capacity(chunk.len());
                     let bound_func = func.bind(py);
                     

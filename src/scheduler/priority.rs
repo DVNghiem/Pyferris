@@ -58,13 +58,13 @@ impl Ord for TaskPriority {
 /// Task with priority
 #[derive(Clone)]
 pub struct PriorityTask {
-    task: Arc<PyObject>,
+    task: Arc<Py<PyAny>>,
     priority: TaskPriority,
     id: usize,
 }
 
 impl PriorityTask {
-    pub fn new(task: Arc<PyObject>, priority: TaskPriority, id: usize) -> Self {
+    pub fn new(task: Arc<Py<PyAny>>, priority: TaskPriority, id: usize) -> Self {
         Self { task, priority, id }
     }
 }
@@ -132,7 +132,7 @@ impl PriorityScheduler {
     }
 
     /// Execute tasks in priority order
-    pub fn execute(&self, py: Python, tasks_with_priorities: Vec<(Bound<PyAny>, Option<TaskPriority>)>) -> PyResult<Vec<PyObject>> {
+    pub fn execute(&self, py: Python, tasks_with_priorities: Vec<(Bound<PyAny>, Option<TaskPriority>)>) -> PyResult<Vec<Py<PyAny>>> {
         if tasks_with_priorities.is_empty() {
             return Ok(Vec::new());
         }
@@ -149,7 +149,7 @@ impl PriorityScheduler {
         priority_tasks.sort_by(|a, b| b.cmp(a));
 
         // Execute tasks in priority order using parallel processing within each priority level
-        let mut results: Vec<Option<PyObject>> = (0..priority_tasks.len()).map(|_| None).collect();
+        let mut results: Vec<Option<Py<PyAny>>> = (0..priority_tasks.len()).map(|_| None).collect();
         let mut current_priority = None;
         let mut priority_group = Vec::new();
         let mut group_indices = Vec::new();
@@ -180,7 +180,7 @@ impl PriorityScheduler {
     }
 
     /// Execute all tasks in queue
-    pub fn execute_queue(&self, py: Python) -> PyResult<Vec<PyObject>> {
+    pub fn execute_queue(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         let mut queue = self.task_queue.lock().unwrap();
         if queue.is_empty() {
             return Ok(Vec::new());
@@ -194,7 +194,7 @@ impl PriorityScheduler {
         drop(queue);
 
         // Execute tasks in priority order
-        let mut results: Vec<Option<PyObject>> = (0..tasks.len()).map(|_| None).collect();
+        let mut results: Vec<Option<Py<PyAny>>> = (0..tasks.len()).map(|_| None).collect();
         let mut current_priority = None;
         let mut priority_group = Vec::new();
         let mut group_indices = Vec::new();
@@ -247,15 +247,15 @@ impl PriorityScheduler {
     fn execute_priority_group(
         &self,
         py: Python,
-        tasks: &[Arc<PyObject>],
+        tasks: &[Arc<Py<PyAny>>],
         indices: &[usize],
-        results: &mut Vec<Option<PyObject>>,
+        results: &mut Vec<Option<Py<PyAny>>>,
     ) -> PyResult<()> {
         // Execute tasks in parallel within the same priority group
-        let group_results: PyResult<Vec<PyObject>> = py.allow_threads(|| {
+        let group_results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
             tasks.par_iter()
                 .map(|task| {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let bound_task = task.bind(py);
                         bound_task.call0().map(|r| r.into())
                     })
@@ -282,13 +282,13 @@ pub fn execute_with_priority(
     py: Python,
     tasks_with_priorities: Vec<(Bound<PyAny>, Option<TaskPriority>)>,
     workers: Option<usize>,
-) -> PyResult<Vec<PyObject>> {
+) -> PyResult<Vec<Py<PyAny>>> {
     let scheduler = PriorityScheduler::new(workers);
     scheduler.execute(py, tasks_with_priorities)
 }
 
 /// Helper function to create priority tasks
 #[pyfunction]
-pub fn create_priority_task(task: Bound<PyAny>, priority: Option<TaskPriority>) -> (PyObject, Option<TaskPriority>) {
+pub fn create_priority_task(task: Bound<PyAny>, priority: Option<TaskPriority>) -> (Py<PyAny>, Option<TaskPriority>) {
     (task.into(), priority)
 }

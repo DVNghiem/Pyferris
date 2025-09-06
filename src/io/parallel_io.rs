@@ -30,7 +30,7 @@ impl ParallelFileProcessor {
     }
 
     /// Process multiple files in parallel with a custom function
-    pub fn process_files(&self, py: Python, file_paths: Vec<String>, processor_func: PyObject) -> PyResult<Py<PyList>> {
+    pub fn process_files(&self, py: Python, file_paths: Vec<String>, processor_func: Py<PyAny>) -> PyResult<Py<PyList>> {
         // Set up thread pool if custom worker count is specified
         if self.max_workers != rayon::current_num_threads() {
             rayon::ThreadPoolBuilder::new()
@@ -53,9 +53,9 @@ impl ParallelFileProcessor {
             .map_err(|e| ParallelExecutionError::new_err(e))?;
 
         // Then process with Python function sequentially to avoid GIL deadlock
-        let results: Result<Vec<_>, _> = py.allow_threads(|| {
+        let results: Result<Vec<_>, _> = py.detach(|| {
             file_contents.into_iter().map(|(file_path, content)| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let args = (file_path.as_str(), content.as_str());
                     processor_func.call1(py, args)
                         .map_err(|e| ParallelExecutionError::new_err(format!("Processor function failed for {}: {}", file_path, e)))
@@ -132,7 +132,7 @@ impl ParallelFileProcessor {
     }
 
     /// Process directory recursively in parallel
-    pub fn process_directory(&self, py: Python, dir_path: &str, file_filter: Option<PyObject>, processor_func: PyObject) -> PyResult<Py<PyList>> {
+    pub fn process_directory(&self, py: Python, dir_path: &str, file_filter: Option<Py<PyAny>>, processor_func: Py<PyAny>) -> PyResult<Py<PyList>> {
         let paths = collect_files_recursive(dir_path)?;
         
         // Filter files if filter function is provided
@@ -229,7 +229,7 @@ fn collect_files_recursive_helper(dir: &Path, files: &mut Vec<String>) -> PyResu
 
 /// Process files in chunks with parallel execution
 #[pyfunction]
-pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usize, processor_func: PyObject) -> PyResult<Py<PyList>> {
+pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usize, processor_func: Py<PyAny>) -> PyResult<Py<PyList>> {
     let content = std::fs::read_to_string(file_path)
         .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
     
@@ -243,7 +243,7 @@ pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usi
     let results: Result<Vec<_>, _> = chunks
         .into_iter()
         .enumerate()
-        .map(|(chunk_idx, chunk)| -> PyResult<PyObject> {
+        .map(|(chunk_idx, chunk)| -> PyResult<Py<PyAny>> {
             let chunk_lines = PyList::empty(py);
             for line in chunk {
                 chunk_lines.append(line)?;

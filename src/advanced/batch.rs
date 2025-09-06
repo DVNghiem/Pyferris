@@ -20,13 +20,13 @@ impl BatchProcessor {
         } else {
             max_workers
         };
-        
+
         Self {
             batch_size,
             max_workers: workers,
         }
     }
-    
+
     /// Process data in batches with a custom function
     pub fn process_batches(
         &self,
@@ -34,21 +34,24 @@ impl BatchProcessor {
         data: Bound<PyAny>,
         processor_func: Bound<PyAny>,
     ) -> PyResult<Py<PyList>> {
-        let items: Vec<PyObject> = data.try_iter()?.map(|item| item.map(|i| i.into())).collect::<PyResult<Vec<_>>>()?;
-        
+        let items: Vec<Py<PyAny>> = data
+            .try_iter()?
+            .map(|item| item.map(|i| i.into()))
+            .collect::<PyResult<Vec<_>>>()?;
+
         if items.is_empty() {
             return Ok(PyList::empty(py).into());
         }
-        
-        let processor_func: Arc<PyObject> = Arc::new(processor_func.into());
-        
+
+        let processor_func: Arc<Py<PyAny>> = Arc::new(processor_func.into());
+
         // Process batches in parallel
-        let results: Vec<PyObject> = py.allow_threads(|| {
+        let results: Vec<Py<PyAny>> = py.detach(|| {
             items
                 .par_chunks(self.batch_size)
                 .enumerate()
                 .map(|(batch_idx, batch)| {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let batch_list = PyList::new(py, batch)?;
                         let args = (batch_idx, batch_list);
                         processor_func.call1(py, args)
@@ -56,17 +59,17 @@ impl BatchProcessor {
                 })
                 .collect::<PyResult<Vec<_>>>()
         })?;
-        
+
         let py_list = PyList::new(py, results)?;
         Ok(py_list.into())
     }
-    
+
     /// Get batch size
     #[getter]
     pub fn batch_size(&self) -> usize {
         self.batch_size
     }
-    
+
     /// Get max workers
     #[getter]
     pub fn max_workers(&self) -> usize {
@@ -82,21 +85,24 @@ pub fn parallel_chunks(
     chunk_size: usize,
     processor_func: Bound<PyAny>,
 ) -> PyResult<Py<PyList>> {
-    let items: Vec<PyObject> = iterable.try_iter()?.map(|item| item.map(|i| i.into())).collect::<PyResult<Vec<_>>>()?;
-    
+    let items: Vec<Py<PyAny>> = iterable
+        .try_iter()?
+        .map(|item| item.map(|i| i.into()))
+        .collect::<PyResult<Vec<_>>>()?;
+
     if items.is_empty() {
         return Ok(PyList::empty(py).into());
     }
-    
-    let processor_func: Arc<PyObject> = Arc::new(processor_func.into());
-    
+
+    let processor_func: Arc<Py<PyAny>> = Arc::new(processor_func.into());
+
     // Process chunks in parallel
-    let results: Vec<PyObject> = py.allow_threads(|| {
+    let results: Vec<Py<PyAny>> = py.detach(|| {
         items
             .par_chunks(chunk_size)
             .enumerate()
             .map(|(chunk_idx, chunk)| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let chunk_list = PyList::new(py, chunk)?;
                     let args = (chunk_idx, chunk_list);
                     processor_func.call1(py, args)
@@ -104,7 +110,7 @@ pub fn parallel_chunks(
             })
             .collect::<PyResult<Vec<_>>>()
     })?;
-    
+
     let py_list = PyList::new(py, results)?;
     Ok(py_list.into())
 }
