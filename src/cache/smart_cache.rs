@@ -59,7 +59,7 @@ impl EvictionPolicy {
 /// Cache entry metadata
 #[derive(Debug)]
 struct CacheEntry {
-    value: PyObject,
+    value: Py<PyAny>,
     access_count: u64,
     last_accessed: Instant,
     created_at: Instant,
@@ -89,7 +89,7 @@ pub struct SmartCache {
 
 impl SmartCache {
     /// Hash a Python object to use as cache key
-    fn hash_key(&self, py: Python, key: &PyObject) -> PyResult<u64> {
+    fn hash_key(&self, py: Python, key: &Py<PyAny>) -> PyResult<u64> {
         let key_str = key.bind(py).str()?.to_string();
         let mut hasher = DefaultHasher::new();
         key_str.hash(&mut hasher);
@@ -225,7 +225,7 @@ impl SmartCache {
     }
 
     /// Get a value from the cache
-    pub fn get(&self, py: Python, key: PyObject) -> PyResult<Option<PyObject>> {
+    pub fn get(&self, py: Python, key: Py<PyAny>) -> PyResult<Option<Py<PyAny>>> {
         let hash_key = self.hash_key(py, &key)?;
         let mut cache = self.cache.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Cache lock poisoned")
@@ -258,7 +258,7 @@ impl SmartCache {
     }
 
     /// Put a value into the cache
-    pub fn put(&self, py: Python, key: PyObject, value: PyObject) -> PyResult<()> {
+    pub fn put(&self, py: Python, key: Py<PyAny>, value: Py<PyAny>) -> PyResult<()> {
         let hash_key = self.hash_key(py, &key)?;
         let mut cache = self.cache.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Cache lock poisoned")
@@ -288,7 +288,7 @@ impl SmartCache {
     }
 
     /// Check if a key exists in the cache
-    pub fn contains(&self, py: Python, key: PyObject) -> PyResult<bool> {
+    pub fn contains(&self, py: Python, key: Py<PyAny>) -> PyResult<bool> {
         let hash_key = self.hash_key(py, &key)?;
         let cache = self.cache.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Cache lock poisoned")
@@ -302,7 +302,7 @@ impl SmartCache {
     }
 
     /// Remove a key from the cache
-    pub fn remove(&self, py: Python, key: PyObject) -> PyResult<Option<PyObject>> {
+    pub fn remove(&self, py: Python, key: Py<PyAny>) -> PyResult<Option<Py<PyAny>>> {
         let hash_key = self.hash_key(py, &key)?;
         let mut cache = self.cache.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Cache lock poisoned")
@@ -346,7 +346,7 @@ impl SmartCache {
     }
 
     /// Get cache statistics
-    pub fn stats(&self, py: Python) -> PyResult<PyObject> {
+    pub fn stats(&self, py: Python) -> PyResult<Py<PyAny>> {
         let stats = self.stats.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Stats lock poisoned")
         })?;

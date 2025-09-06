@@ -87,7 +87,7 @@ def async_examples():
     # Example 2: Limited concurrency
     print("\n2. Limited Concurrency:")
     limited_results = async_executor.map_async_limited(
-        lambda x: x ** 2, range(20), max_concurrent=3
+        lambda x: x ** 2, range(20)
     )
     print(f"Limited concurrency results: {limited_results[:10]}")
     
@@ -98,7 +98,7 @@ def async_examples():
         return x % 2 == 0
     
     start_time = time.time()
-    filtered = async_parallel_filter(is_even_slow, range(50), max_concurrent=8)
+    filtered = async_parallel_filter(is_even_slow, range(50))
     end_time = time.time()
     
     print(f"Async filter time: {end_time - start_time:.3f}s")

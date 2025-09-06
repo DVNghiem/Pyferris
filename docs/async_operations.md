@@ -705,8 +705,8 @@ class AsyncTask:
 ### Functions
 
 ```python
-async def async_parallel_map(func: Callable, items: List[Any], max_concurrent: int = None) -> List[Any]
-async def async_parallel_filter(predicate: Callable, items: List[Any], max_concurrent: int = None) -> List[Any]
+async def async_parallel_map(func: Callable, items: List[Any]) -> List[Any]
+async def async_parallel_filter(predicate: Callable, items: List[Any]) -> List[Any]
 ```
 
 This comprehensive async operations documentation provides everything needed to leverage PyFerris's powerful async capabilities for efficient concurrent processing.

@@ -9,7 +9,7 @@ pub fn memory_mapped_array(
     size: usize,
     dtype: Option<&str>,
     mode: Option<&str>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     // Import numpy
     let numpy = py.import("numpy")?;
     let memmap = numpy.getattr("memmap")?;
@@ -52,7 +52,7 @@ pub fn memory_mapped_array_2d(
     shape: (usize, usize),
     dtype: Option<&str>,
     mode: Option<&str>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     // Import numpy
     let numpy = py.import("numpy")?;
     let memmap = numpy.getattr("memmap")?;
@@ -89,7 +89,7 @@ pub fn memory_mapped_array_2d(
 
 /// Get information about a memory-mapped file
 #[pyfunction]
-pub fn memory_mapped_info(py: Python, filepath: &str) -> PyResult<PyObject> {
+pub fn memory_mapped_info(py: Python, filepath: &str) -> PyResult<Py<PyAny>> {
     let path = Path::new(filepath);
     
     if !path.exists() {
@@ -126,7 +126,7 @@ pub fn create_temp_mmap(
     size: usize,
     dtype: Option<&str>,
     prefix: Option<&str>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     // Import tempfile
     let tempfile = py.import("tempfile")?;
     let named_temp_file = tempfile.getattr("NamedTemporaryFile")?;

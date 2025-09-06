@@ -91,7 +91,6 @@ impl DistributedExecutor {
 
         // Select a node for the task
         let cluster = self.cluster.lock().unwrap();
-        let selected_node = self.load_balancer.select_node(&cluster, task.requirements.clone().into())?;
         drop(cluster);
 
         let mut tasks = self.tasks.lock().unwrap();
@@ -541,7 +540,7 @@ pub fn cluster_map(
     iterable: Bound<'_, PyAny>,
     cluster_manager: &ClusterManager,
     chunk_size: Option<usize>
-) -> PyResult<Vec<PyObject>> {
+) -> PyResult<Vec<Py<PyAny>>> {
     let _executor = DistributedExecutor::new(cluster_manager, None);
     
     // Convert iterable to Vec
@@ -571,7 +570,7 @@ pub fn distributed_reduce(
     iterable: Bound<'_, PyAny>,
     initializer: Option<Bound<'_, PyAny>>,
     _cluster_manager: &ClusterManager
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     // Convert to list for easier handling
     let items: Vec<Bound<PyAny>> = iterable.try_iter()?.collect::<Result<Vec<_>, _>>()?;
     

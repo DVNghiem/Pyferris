@@ -43,17 +43,17 @@ impl Executor {
     }
 
     /// Submit a single task with explicit arguments
-    pub fn submit_with_args(&self, func: Bound<PyAny>, args: Bound<PyTuple>) -> PyResult<PyObject> {
+    pub fn submit_with_args(&self, func: Bound<PyAny>, args: Bound<PyTuple>) -> PyResult<Py<PyAny>> {
         // For single tasks with args, we use the thread pool but wait for completion
         let py = func.py();
         
         if let Some(ref pool) = self.thread_pool {
-            let func_obj: Arc<PyObject> = Arc::new(func.into());
-            let args_obj: Arc<PyObject> = Arc::new(args.into());
+            let func_obj: Arc<Py<PyAny>> = Arc::new(func.into());
+            let args_obj: Arc<Py<PyAny>> = Arc::new(args.into());
             
-            py.allow_threads(|| {
-                pool.install(|| -> PyResult<PyObject> {
-                    Python::with_gil(|py| {
+            py.detach(|| {
+                pool.install(|| -> PyResult<Py<PyAny>> {
+                    Python::attach(|py| {
                         let bound_func = func_obj.bind(py);
                         let bound_args = args_obj.bind(py).downcast::<PyTuple>()?;
                         let result = bound_func.call1(bound_args)?;
@@ -69,15 +69,15 @@ impl Executor {
     }
 
     /// Submit a single task (for compatibility with asyncio.run_in_executor)
-    pub fn submit(&self, func: Bound<PyAny>) -> PyResult<PyObject> {
+    pub fn submit(&self, func: Bound<PyAny>) -> PyResult<Py<PyAny>> {
         let py = func.py();
         
         if let Some(ref pool) = self.thread_pool {
-            let func_obj: Arc<PyObject> = Arc::new(func.into());
+            let func_obj: Arc<Py<PyAny>> = Arc::new(func.into());
             
-            py.allow_threads(|| {
-                pool.install(|| -> PyResult<PyObject> {
-                    Python::with_gil(|py| {
+            py.detach(|| {
+                pool.install(|| -> PyResult<Py<PyAny>> {
+                    Python::attach(|py| {
                         let bound_func = func_obj.bind(py);
                         let result = bound_func.call0()?;
                         Ok(result.into())
@@ -96,8 +96,8 @@ impl Executor {
         let py = func.py();
         self.task_count.fetch_add(1, Ordering::Relaxed);
         
-        // Convert to PyObjects with optimized allocation
-        let items: Vec<PyObject> = {
+        // Convert to Py<PyAny> with optimized allocation
+        let items: Vec<Py<PyAny>> = {
             let iter = iterable.try_iter()?;
             let mut items = Vec::new();
             
@@ -126,9 +126,9 @@ impl Executor {
                 // For small datasets, consider sequential processing
                 if items.len() < min_chunk_size.min(self.max_workers * 2) {
                     // Sequential processing for very small datasets
-                    let results: PyResult<Vec<PyObject>> = items
+                    let results: PyResult<Vec<Py<PyAny>>> = items
                         .iter()
-                        .map(|item| -> PyResult<PyObject> {
+                        .map(|item| -> PyResult<Py<PyAny>> {
                             let bound_item = item.bind(py);
                             let result = func.call1((bound_item,))?;
                             Ok(result.into())
@@ -145,16 +145,16 @@ impl Executor {
             _ => (items.len() / (self.max_workers * 4)).max(1000).min(5000),
         };
         
-        let func: Arc<PyObject> = Arc::new(func.into());
+        let func: Arc<Py<PyAny>> = Arc::new(func.into());
         
         // Use our custom thread pool if available, otherwise fall back to global pool
-        let results: Vec<SmallVec<[PyObject; 8]>> = if let Some(ref pool) = self.thread_pool {
-            py.allow_threads(|| {
-                pool.install(|| -> PyResult<Vec<SmallVec<[PyObject; 8]>>> {
-                    let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+        let results: Vec<SmallVec<[Py<PyAny>; 8]>> = if let Some(ref pool) = self.thread_pool {
+            py.detach(|| {
+                pool.install(|| -> PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> {
+                    let chunk_results: PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> = items
                         .par_chunks(optimal_chunk_size)
-                        .map(|chunk| -> PyResult<SmallVec<[PyObject; 8]>> {
-                            Python::with_gil(|py| {
+                        .map(|chunk| -> PyResult<SmallVec<[Py<PyAny>; 8]>> {
+                            Python::attach(|py| {
                                 let mut chunk_results = SmallVec::with_capacity(chunk.len());
                                 let bound_func = func.bind(py);
                                 
@@ -174,11 +174,11 @@ impl Executor {
             })?
         } else {
             // Use global pool as fallback with chunking
-            py.allow_threads(|| -> PyResult<Vec<SmallVec<[PyObject; 8]>>> {
-                let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+            py.detach(|| -> PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> {
+                let chunk_results: PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> = items
                     .par_chunks(optimal_chunk_size)
-                    .map(|chunk| -> PyResult<SmallVec<[PyObject; 8]>> {
-                        Python::with_gil(|py| {
+                    .map(|chunk| -> PyResult<SmallVec<[Py<PyAny>; 8]>> {
+                        Python::attach(|py| {
                             let mut chunk_results = SmallVec::with_capacity(chunk.len());
                             let bound_func = func.bind(py);
                             
@@ -219,7 +219,7 @@ impl Executor {
         }
         
         // Convert tasks to thread-safe format
-        let task_objects: Vec<(Arc<PyObject>, Option<Arc<PyObject>>)> = tasks
+        let task_objects: Vec<(Arc<Py<PyAny>>, Option<Arc<Py<PyAny>>>)> = tasks
             .into_iter()
             .map(|(func, args)| {
                 let func_obj = Arc::new(func.into());
@@ -229,12 +229,12 @@ impl Executor {
             .collect();
         
         if let Some(ref pool) = self.thread_pool {
-            let results = py.allow_threads(|| {
-                pool.install(|| -> PyResult<Vec<PyObject>> {
-                    let chunk_results: PyResult<Vec<PyObject>> = task_objects
+            let results = py.detach(|| {
+                pool.install(|| -> PyResult<Vec<Py<PyAny>>> {
+                    let chunk_results: PyResult<Vec<Py<PyAny>>> = task_objects
                         .par_iter()
-                        .map(|(func_obj, args_obj)| -> PyResult<PyObject> {
-                            Python::with_gil(|py| {
+                        .map(|(func_obj, args_obj)| -> PyResult<Py<PyAny>> {
+                            Python::attach(|py| {
                                 let bound_func = func_obj.bind(py);
                                 let result = if let Some(args) = args_obj {
                                     let bound_args = args.bind(py).downcast::<PyTuple>()?;
@@ -254,9 +254,9 @@ impl Executor {
             Ok(py_list.into())
         } else {
             // Fallback to sequential execution
-            let results: PyResult<Vec<PyObject>> = task_objects
+            let results: PyResult<Vec<Py<PyAny>>> = task_objects
                 .iter()
-                .map(|(func_obj, args_obj)| -> PyResult<PyObject> {
+                .map(|(func_obj, args_obj)| -> PyResult<Py<PyAny>> {
                     let bound_func = func_obj.bind(py);
                     let result = if let Some(args) = args_obj {
                         let bound_args = args.bind(py).downcast::<PyTuple>()?;

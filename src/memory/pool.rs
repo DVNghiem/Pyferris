@@ -118,7 +118,7 @@ impl MemoryPool {
     }
 
     /// Get memory usage statistics
-    pub fn stats(&self, py: Python) -> PyResult<PyObject> {
+    pub fn stats(&self, py: Python) -> PyResult<Py<PyAny>> {
         let pool = self.pool.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
         })?;

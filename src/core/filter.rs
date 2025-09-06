@@ -12,8 +12,8 @@ pub fn parallel_filter(
     iterable: Bound<PyAny>,
     chunk_size: Option<usize>,
 ) -> PyResult<Py<PyList>> {
-    // Convert to PyObjects to avoid Sync issues - optimized with capacity hint
-    let items: Vec<PyObject> = {
+    // Convert to Py<PyAny>s to avoid Sync issues - optimized with capacity hint
+    let items: Vec<Py<PyAny>> = {
         let iter = iterable.try_iter()?;
         let mut items = Vec::new();
         
@@ -48,15 +48,15 @@ pub fn parallel_filter(
         }
     });
 
-    let predicate: Arc<PyObject> = Arc::new(predicate.into());
+    let predicate: Arc<Py<PyAny>> = Arc::new(predicate.into());
     
     // Use thread-local storage for better performance
-    let filtered_results: Vec<SmallVec<[PyObject; 8]>> = py.allow_threads(|| {
+    let filtered_results: Vec<SmallVec<[Py<PyAny>; 8]>> = py.detach(|| {
         // Use try_fold for better error handling and performance
-        let chunk_results: PyResult<Vec<SmallVec<[PyObject; 8]>>> = items
+        let chunk_results: PyResult<Vec<SmallVec<[Py<PyAny>; 8]>>> = items
             .par_chunks(chunk_size)
             .map(|chunk| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     // Use SmallVec for small chunks to avoid heap allocation
                     let mut chunk_results = SmallVec::new();
                     let bound_predicate = predicate.bind(py);

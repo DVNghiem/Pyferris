@@ -9,9 +9,9 @@ pub fn parallel_reduce(
     iterable: Bound<PyAny>,
     initializer: Option<Bound<PyAny>>,
     chunk_size: Option<usize>,
-) -> PyResult<PyObject> {
-    // Convert to PyObjects with optimized allocation
-    let items: Vec<PyObject> = {
+) -> PyResult<Py<PyAny>> {
+    // Convert to Py<PyAny>s with optimized allocation
+    let items: Vec<Py<PyAny>> = {
         let iter = iterable.try_iter()?;
         let mut items = Vec::new();
         
@@ -51,16 +51,16 @@ pub fn parallel_reduce(
         }
     });
 
-    let func: Arc<PyObject> = Arc::new(func.into());
-    let initializer: Option<PyObject> = initializer.map(|init| init.into());
+    let func: Arc<Py<PyAny>> = Arc::new(func.into());
+    let initializer: Option<Py<PyAny>> = initializer.map(|init| init.into());
     
     // First, reduce within each chunk using parallel processing with optimized error handling
-    let chunk_results: Vec<PyObject> = Python::with_gil(|py| {
-        py.allow_threads(|| {
-            let results: PyResult<Vec<PyObject>> = items
+    let chunk_results: Vec<Py<PyAny>> = Python::attach(|py| {
+        py.detach(|| {
+            let results: PyResult<Vec<Py<PyAny>>> = items
                 .par_chunks(chunk_size)
                 .map(|chunk| {
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let bound_func = func.bind(py);
                         let mut result = if let Some(ref init) = initializer {
                             init.clone_ref(py)
@@ -89,7 +89,7 @@ pub fn parallel_reduce(
     if chunk_results.len() == 1 {
         Ok(chunk_results.into_iter().next().unwrap())
     } else {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let bound_func = func.bind(py);
             let mut final_result = chunk_results[0].clone_ref(py);
             
