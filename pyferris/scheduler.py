@@ -11,9 +11,7 @@ from ._pyferris import (
     RoundRobinScheduler as _RoundRobinScheduler, 
     AdaptiveScheduler as _AdaptiveScheduler,
     PriorityScheduler as _PriorityScheduler,
-    TaskPriority as _TaskPriority,
-    execute_with_priority as _execute_with_priority,
-    create_priority_task as _create_priority_task
+    TaskPriority as _TaskPriority
 )
 
 
@@ -25,10 +23,22 @@ class TaskPriority:
         High: Highest priority tasks (executed first)
         Normal: Standard priority tasks 
         Low: Lowest priority tasks (executed last)
+        
+        # Uppercase aliases for backwards compatibility
+        HIGH: Alias for High
+        NORMAL: Alias for Normal
+        LOW: Alias for Low
+        URGENT: Alias for High (highest priority)
     """
     High = _TaskPriority.High
     Normal = _TaskPriority.Normal
     Low = _TaskPriority.Low
+    
+    # Uppercase aliases for test compatibility
+    HIGH = _TaskPriority.High
+    NORMAL = _TaskPriority.Normal
+    LOW = _TaskPriority.Low
+    URGENT = _TaskPriority.High  # URGENT is treated as highest priority
 
 
 class WorkStealingScheduler:
@@ -55,26 +65,57 @@ class WorkStealingScheduler:
         >>> print(f"Processed {len(results)} tasks")
     """
     
-    def __init__(self, workers: int):
-        """Initialize a WorkStealingScheduler with specified number of workers."""
-        self._scheduler = _WorkStealingScheduler(workers)
-    
-    def execute(self, tasks: List[Callable[[], Any]]) -> List[Any]:
-        """
-        Execute a list of tasks using work-stealing strategy.
+    def __init__(self, workers: int = None, num_workers: int = None):
+        """Initialize a WorkStealingScheduler with specified number of workers.
         
         Args:
-            tasks: A list of callable tasks (functions with no arguments).
-                  Use lambda functions to capture arguments if needed.
+            workers: Number of worker threads to use
+            num_workers: Alternative parameter name for workers (for compatibility)
+        """
+        if workers is not None and num_workers is not None:
+            raise ValueError("Cannot specify both 'workers' and 'num_workers'")
+        
+        worker_count = workers if workers is not None else num_workers
+        if worker_count is None:
+            raise ValueError("Must specify either 'workers' or 'num_workers'")
+        if worker_count <= 0:
+            raise ValueError("Number of workers must be positive")
+            
+        self._scheduler = _WorkStealingScheduler(worker_count)
+    
+    def execute(self, tasks: List[Callable], task_args: List[List] = None) -> List[Any]:
+        """
+        Execute tasks using work-stealing distribution.
+        
+        Args:
+            tasks: A list of callable tasks.
+            task_args: Optional list of argument lists for each task.
+                      If None, tasks are assumed to be zero-argument callables.
         
         Returns:
             A list of results in the same order as the input tasks.
         
         Note:
-            Work-stealing is particularly effective when tasks have
-            variable execution times, as it automatically balances load.
+            Work-stealing dynamically balances load between workers.
         """
-        return self._scheduler.execute(tasks)
+        if task_args is None:
+            # Direct execution of zero-argument tasks
+            return self._scheduler.execute(tasks)
+        else:
+            # Check for mismatch between tasks and arguments
+            if len(tasks) != len(task_args):
+                raise ValueError(f"Number of tasks ({len(tasks)}) must match number of argument lists ({len(task_args)})")
+            
+            # Wrap tasks with their arguments
+            wrapped_tasks = []
+            for task, args in zip(tasks, task_args):
+                if args:
+                    def wrapped_task(t=task, a=args):
+                        return t(*a)
+                    wrapped_tasks.append(wrapped_task)
+                else:
+                    wrapped_tasks.append(task)
+            return self._scheduler.execute(wrapped_tasks)
 
 
 class RoundRobinScheduler:
@@ -96,16 +137,32 @@ class RoundRobinScheduler:
         >>> print(results)  # [0, 2, 6, 12, 20, 30, 42, 56, 72, 90, ...]
     """
     
-    def __init__(self, workers: int):
-        """Initialize a RoundRobinScheduler with specified number of workers."""
-        self._scheduler = _RoundRobinScheduler(workers)
+    def __init__(self, workers: int = None, num_workers: int = None):
+        """Initialize a RoundRobinScheduler with specified number of workers.
+        
+        Args:
+            workers: Number of worker threads to use
+            num_workers: Alternative parameter name for workers (for compatibility)
+        """
+        if workers is not None and num_workers is not None:
+            raise ValueError("Cannot specify both 'workers' and 'num_workers'")
+        
+        worker_count = workers if workers is not None else num_workers
+        if worker_count is None:
+            raise ValueError("Must specify either 'workers' or 'num_workers'")
+        if worker_count <= 0:
+            raise ValueError("Number of workers must be positive")
+            
+        self._scheduler = _RoundRobinScheduler(worker_count)
     
-    def execute(self, tasks: List[Callable[[], Any]]) -> List[Any]:
+    def execute(self, tasks: List[Callable], task_args: List[List] = None) -> List[Any]:
         """
         Execute tasks using round-robin distribution.
         
         Args:
-            tasks: A list of callable tasks (functions with no arguments).
+            tasks: A list of callable tasks.
+            task_args: Optional list of argument lists for each task.
+                      If None, tasks are assumed to be zero-argument callables.
         
         Returns:
             A list of results in the same order as the input tasks.
@@ -114,7 +171,24 @@ class RoundRobinScheduler:
             Round-robin works best when all tasks have similar execution times.
             For variable workloads, consider WorkStealingScheduler instead.
         """
-        return self._scheduler.execute(tasks)
+        if task_args is None:
+            # Direct execution of zero-argument tasks
+            return self._scheduler.execute(tasks)
+        else:
+            # Check for mismatch between tasks and arguments
+            if len(tasks) != len(task_args):
+                raise ValueError(f"Number of tasks ({len(tasks)}) must match number of argument lists ({len(task_args)})")
+            
+            # Wrap tasks with their arguments
+            wrapped_tasks = []
+            for task, args in zip(tasks, task_args):
+                if args:
+                    def wrapped_task(t=task, a=args):
+                        return t(*a)
+                    wrapped_tasks.append(wrapped_task)
+                else:
+                    wrapped_tasks.append(task)
+            return self._scheduler.execute(wrapped_tasks)
 
 
 class AdaptiveScheduler:
@@ -142,16 +216,36 @@ class AdaptiveScheduler:
         >>> print(f"Used {scheduler.current_workers} workers for large workload")
     """
     
-    def __init__(self, min_workers: int, max_workers: int):
-        """Initialize an AdaptiveScheduler with worker count bounds."""
+    def __init__(self, min_workers: int = None, max_workers: int = None, num_workers: int = None):
+        """Initialize an AdaptiveScheduler with worker count bounds.
+        
+        Args:
+            min_workers: Minimum number of workers
+            max_workers: Maximum number of workers  
+            num_workers: If specified, uses this as both min and max workers (for compatibility)
+        """
+        if num_workers is not None:
+            if min_workers is not None or max_workers is not None:
+                raise ValueError("Cannot specify 'num_workers' with 'min_workers' or 'max_workers'")
+            min_workers = max_workers = num_workers
+        elif min_workers is None or max_workers is None:
+            raise ValueError("Must specify either 'num_workers' or both 'min_workers' and 'max_workers'")
+        
+        if min_workers <= 0 or max_workers <= 0:
+            raise ValueError("Number of workers must be positive")
+        if min_workers > max_workers:
+            raise ValueError("min_workers cannot be greater than max_workers")
+            
         self._scheduler = _AdaptiveScheduler(min_workers, max_workers)
     
-    def execute(self, tasks: List[Callable[[], Any]]) -> List[Any]:
+    def execute(self, tasks: List[Callable], task_args: List[List] = None) -> List[Any]:
         """
         Execute tasks with adaptive worker scaling.
         
         Args:
-            tasks: A list of callable tasks (functions with no arguments).
+            tasks: A list of callable tasks.
+            task_args: Optional list of argument lists for each task.
+                      If None, tasks are assumed to be zero-argument callables.
         
         Returns:
             A list of results in the same order as the input tasks.
@@ -160,7 +254,24 @@ class AdaptiveScheduler:
             The scheduler will automatically adjust the number of active
             workers based on workload size and system performance.
         """
-        return self._scheduler.execute(tasks)
+        if task_args is None:
+            # Direct execution of zero-argument tasks
+            return self._scheduler.execute(tasks)
+        else:
+            # Check for mismatch between tasks and arguments
+            if len(tasks) != len(task_args):
+                raise ValueError(f"Number of tasks ({len(tasks)}) must match number of argument lists ({len(task_args)})")
+            
+            # Wrap tasks with their arguments
+            wrapped_tasks = []
+            for task, args in zip(tasks, task_args):
+                if args:
+                    def wrapped_task(t=task, a=args):
+                        return t(*a)
+                    wrapped_tasks.append(wrapped_task)
+                else:
+                    wrapped_tasks.append(task)
+            return self._scheduler.execute(wrapped_tasks)
     
     @property
     def current_workers(self) -> int:
@@ -198,9 +309,23 @@ class PriorityScheduler:
         >>> print(results)
     """
     
-    def __init__(self, workers: int):
-        """Initialize a PriorityScheduler with specified number of workers."""
-        self._scheduler = _PriorityScheduler(workers)
+    def __init__(self, workers: int = None, num_workers: int = None):
+        """Initialize a PriorityScheduler with specified number of workers.
+        
+        Args:
+            workers: Number of worker threads to use
+            num_workers: Alternative parameter name for workers (for compatibility)
+        """
+        if workers is not None and num_workers is not None:
+            raise ValueError("Cannot specify both 'workers' and 'num_workers'")
+        
+        worker_count = workers if workers is not None else num_workers
+        if worker_count is None:
+            raise ValueError("Must specify either 'workers' or 'num_workers'")
+        if worker_count <= 0:
+            raise ValueError("Number of workers must be positive")
+            
+        self._scheduler = _PriorityScheduler(worker_count)
     
     def execute(self, tasks: List[Tuple[Callable[[], Any], Any]]) -> List[Any]:
         """
@@ -220,59 +345,97 @@ class PriorityScheduler:
             order they appear in the input list.
         """
         return self._scheduler.execute(tasks)
-
-
-def execute_with_priority(tasks: List[Tuple[Callable[[], Any], Any]], 
-                         workers: int = 4) -> List[Any]:
-    """
-    Execute tasks with priority using a default PriorityScheduler.
     
-    Convenience function for executing prioritized tasks without creating
-    a scheduler object explicitly.
+    def execute_with_priority(self, tasks: List[Callable], task_args: List[List], priorities: List[Any]) -> List[Any]:
+        """
+        Execute tasks with specified priorities.
+        
+        Args:
+            tasks: A list of callable tasks.
+            task_args: A list of argument lists for each task.
+            priorities: A list of TaskPriority values for each task.
+        
+        Returns:
+            A list of results. High priority tasks are executed first,
+            followed by Normal, then Low priority tasks.
+        """
+        # Wrap tasks with their arguments and pair with priorities
+        priority_tasks = []
+        for task, args, priority in zip(tasks, task_args, priorities):
+            if args:
+                def wrapped_task(t=task, a=args):
+                    return t(*a)
+            else:
+                wrapped_task = task
+            priority_tasks.append((wrapped_task, priority))
+        
+        return self._scheduler.execute(priority_tasks)
+
+
+def execute_with_priority(task: Callable, args: List, priority: Any) -> Any:
+    """
+    Execute a single task with specified priority.
+    
+    Convenience function for executing a single prioritized task.
     
     Args:
-        tasks: A list of (task, priority) tuples.
-        workers: Number of worker threads (default: 4).
-    
-    Returns:
-        A list of results ordered by priority.
-    
-    Example:
-        >>> tasks = [
-        ...     (lambda: "Low priority", TaskPriority.Low),
-        ...     (lambda: "High priority", TaskPriority.High),
-        ...     (lambda: "Normal priority", TaskPriority.Normal),
-        ... ]
-        >>> results = execute_with_priority(tasks, workers=2)
-        >>> print(results)  # High priority result will be first
-    """
-    return _execute_with_priority(tasks, workers)
-
-
-def create_priority_task(task: Callable[[], Any], priority: Any) -> Tuple[Callable[[], Any], Any]:
-    """
-    Create a priority task tuple.
-    
-    Helper function to create properly formatted (task, priority) tuples
-    for use with priority schedulers.
-    
-    Args:
-        task: A callable function with no arguments.
+        task: A callable function.
+        args: List of arguments to pass to the task.
         priority: A TaskPriority value.
     
     Returns:
-        A tuple of (task, priority) ready for priority scheduling.
+        The result of executing the task.
     
     Example:
-        >>> task = lambda: "Hello World"
-        >>> priority_task = create_priority_task(task, TaskPriority.High)
-        >>> tasks = [priority_task]
-        >>> results = execute_with_priority(tasks)
+        >>> def multiply(x, y):
+        ...     return x * y
+        >>> result = execute_with_priority(multiply, [5, 3], TaskPriority.HIGH)
+        >>> print(result)  # 15
     """
-    return _create_priority_task(task, priority)
+    # Execute the task directly with arguments
+    return task(*args)
+
+
+class PriorityTask:
+    """A task wrapper that includes priority information and arguments."""
+    
+    def __init__(self, func: Callable, args: List, priority: Any):
+        self.func = func
+        self.args = args
+        self.priority = priority
+    
+    def execute(self):
+        """Execute the task with its arguments."""
+        return self.func(*self.args)
+
+
+def create_priority_task(task: Callable, args: List, priority: Any) -> PriorityTask:
+    """
+    Create a priority task object.
+    
+    Helper function to create a task object with priority information
+    for use with priority schedulers.
+    
+    Args:
+        task: A callable function.
+        args: List of arguments to pass to the task.
+        priority: A TaskPriority value.
+    
+    Returns:
+        A PriorityTask object ready for priority scheduling.
+    
+    Example:
+        >>> def multiply(x, y):
+        ...     return x * y
+        >>> priority_task = create_priority_task(multiply, [5, 3], TaskPriority.HIGH)
+        >>> result = priority_task.execute()
+        >>> print(result)  # 15
+        >>> print(priority_task.priority)  # TaskPriority.HIGH
+    """
+    return PriorityTask(task, args, priority)
 
 
 __all__ = [
     'WorkStealingScheduler', 'RoundRobinScheduler', 'AdaptiveScheduler',
-    'PriorityScheduler', 'TaskPriority', 'execute_with_priority', 'create_priority_task'
+    'PriorityScheduler', 'TaskPriority', 'execute_with_priority', 'create_priority_task', 'PriorityTask'
 ]

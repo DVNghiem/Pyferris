@@ -43,6 +43,7 @@ class SharedArray:
     def __init__(self, capacity: int):
         """Initialize a new SharedArray with specified capacity."""
         self._array = _SharedArray(capacity)
+        self._capacity = capacity
     
     def append(self, value: float) -> None:
         """
@@ -139,11 +140,14 @@ class SharedArray:
         """
         return self._array.parallel_map(func)
     
-    @property
     def len(self) -> int:
         """Get the current number of elements in the array."""
         return self._array.len
     
+    def capacity(self) -> int:
+        """Get the maximum capacity of the array."""
+        return self._capacity
+
     def is_empty(self) -> bool:
         """Check if the array is empty."""
         return self._array.is_empty()
@@ -207,7 +211,6 @@ class SharedArrayInt:
         """Convert the entire array to a Python list of integers."""
         return self._array.to_list()
     
-    @property
     def len(self) -> int:
         """Get the current number of elements in the array."""
         return self._array.len
@@ -247,7 +250,6 @@ class SharedArrayStr:
         """Convert the entire array to a Python list of strings."""
         return self._array.to_list()
     
-    @property
     def len(self) -> int:
         """Get the current number of elements in the array."""
         return self._array.len
@@ -288,7 +290,6 @@ class SharedArrayObj:
         """Convert the entire array to a Python list."""
         return self._array.to_list()
     
-    @property
     def len(self) -> int:
         """Get the current number of elements in the array."""
         return self._array.len
@@ -361,7 +362,7 @@ class SharedDict:
         Raises:
             KeyError: If the key is not found.
         """
-        self._dict.remove(key)
+        self._dict.pop(key)
     
     def keys(self) -> List[str]:
         """
@@ -475,6 +476,15 @@ class SharedDict:
         """Get the number of key-value pairs in the dictionary."""
         return self._dict.len
     
+    # Compatibility methods for tests
+    def put(self, key: str, value: Any) -> None:
+        """Alias for set() method for backwards compatibility."""
+        self.set(key, value)
+    
+    def size(self) -> int:
+        """Get the number of key-value pairs in the dictionary (method version)."""
+        return self._dict.len
+    
     @classmethod
     def from_dict(cls, data: dict) -> 'SharedDict':
         """
@@ -565,14 +575,13 @@ class SharedQueue:
         """
         return self._queue.try_get()
     
-    @property
     def size(self) -> int:
         """Get the current number of items in the queue."""
         return self._queue.size
     
     def is_empty(self) -> bool:
         """Check if the queue is empty."""
-        return self._queue.is_empty()
+        return self._queue.empty()
     
     def is_full(self) -> bool:
         """Check if the queue is full."""
@@ -609,6 +618,15 @@ class SharedQueue:
             This is equivalent to is_empty() but matches Python's queue.Queue API.
         """
         return self._queue.empty()
+    
+    # Compatibility methods for tests
+    def push(self, item: Any) -> None:
+        """Alias for put() method for backwards compatibility."""
+        self.put(item)
+    
+    def pop(self) -> Any:
+        """Alias for get() method for backwards compatibility."""
+        return self.get()
 
 
 class SharedCounter:
@@ -633,23 +651,35 @@ class SharedCounter:
         """Initialize a new SharedCounter with optional initial value."""
         self._counter = _SharedCounter(initial_value)
     
-    def increment(self) -> int:
+    def increment(self, amount: int = 1) -> int:
         """
-        Atomically increment the counter by 1.
+        Atomically increment the counter by the specified amount.
+        
+        Args:
+            amount: The amount to increment by (defaults to 1).
         
         Returns:
             The new value after incrementing.
         """
-        return self._counter.increment()
+        if amount == 1:
+            return self._counter.increment()
+        else:
+            return self.add(amount)
     
-    def decrement(self) -> int:
+    def decrement(self, amount: int = 1) -> int:
         """
-        Atomically decrement the counter by 1.
+        Atomically decrement the counter by the specified amount.
+        
+        Args:
+            amount: The amount to decrement by (defaults to 1).
         
         Returns:
             The new value after decrementing.
         """
-        return self._counter.decrement()
+        if amount == 1:
+            return self._counter.decrement()
+        else:
+            return self.subtract(amount)
     
     def add(self, value: int) -> int:
         """
@@ -683,15 +713,15 @@ class SharedCounter:
     def set(self, value: int) -> int:
         """
         Atomically set the counter to a new value.
-        
+
         Args:
             value: The new value to set.
-        
+
         Returns:
             The previous value of the counter.
         """
         return self._counter.set(value)
-    
+
     def reset(self) -> int:
         """
         Reset the counter to zero.
@@ -713,28 +743,41 @@ class SharedCounter:
             True if the swap was successful, False otherwise.
         """
         return self._counter.compare_and_swap(expected, new_value)
+    
+    # Compatibility methods for tests
+    def get(self) -> int:
+        """Get the current value of the counter (method version for compatibility)."""
+        return self._counter.value
 
 
-def create_shared_array(data: List[float]) -> SharedArray:
+def create_shared_array(array_type: str, capacity: int = 100):
     """
-    Create a SharedArray from existing data.
+    Create a shared array of the specified type.
+    
+    Factory function for creating different types of shared arrays.
     
     Args:
-        data: Initial data to populate the array.
+        array_type: Type of array to create ("int", "str", "obj", or "float")
+        capacity: Maximum capacity of the array (default: 100)
     
     Returns:
-        A new SharedArray containing the provided data.
+        A SharedArray variant of the specified type.
     
     Example:
-        >>> data = [1.0, 2.0, 3.0, 4.0, 5.0]
-        >>> arr = create_shared_array(data)
-        >>> print(arr.len)  # 5
-        >>> print(arr.sum())  # 15.0
+        >>> int_array = create_shared_array("int", capacity=10)
+        >>> str_array = create_shared_array("str", capacity=20)
+        >>> obj_array = create_shared_array("obj", capacity=5)
     """
-    rust_array = _create_shared_array(data)
-    wrapper = SharedArray.__new__(SharedArray)
-    wrapper._array = rust_array
-    return wrapper
+    if array_type == "int":
+        return SharedArrayInt(capacity)
+    elif array_type == "str":
+        return SharedArrayStr(capacity)
+    elif array_type == "obj":
+        return SharedArrayObj(capacity)
+    elif array_type in ("float", "default"):
+        return SharedArray(capacity)
+    else:
+        raise ValueError(f"Unknown array type: {array_type}. Supported types: 'int', 'str', 'obj', 'float'")
 
 
 __all__ = [

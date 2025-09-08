@@ -1,387 +1,374 @@
 """
-Unit tests for Pyferris Executor functionality.
+PyFerris Executor Tests
 
-This module contains comprehensive tests for the Executor class
-and task execution capabilities.
+Tests for the task executor functionality:
+- Executor class
+- Task submission and execution
+- Context management
+- Error handling
 """
 
-import unittest
+import pytest
 import time
-from pyferris.executor import Executor
+import concurrent.futures
+
+from pyferris import Executor
 
 
-class TestExecutorBasics(unittest.TestCase):
-    """Test basic Executor functionality."""
-    
-    def test_executor_instantiation(self):
-        """Test Executor can be instantiated."""
-        executor = Executor()
-        self.assertIsInstance(executor, Executor)
-    
-    def test_executor_with_workers(self):
-        """Test Executor instantiation with specific worker count."""
-        # Test different worker counts
-        worker_counts = [1, 2, 4, 8]
-        
-        for count in worker_counts:
-            try:
-                executor = Executor(workers=count)
-                self.assertIsInstance(executor, Executor)
-            except TypeError:
-                # If workers parameter doesn't exist, that's fine
-                # We'll test with default constructor
-                executor = Executor()
-                self.assertIsInstance(executor, Executor)
-                break
+class TestExecutor:
+    """Test Executor functionality."""
 
+    def test_executor_creation(self):
+        """Test basic executor creation."""
+        executor = Executor(max_workers=4)
+        assert executor is not None
 
-class TestExecutorMethods(unittest.TestCase):
-    """Test Executor methods and capabilities."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_executor_has_methods(self):
-        """Test that Executor has expected methods."""
-        # Get all public methods
-        methods = [method for method in dir(self.executor) 
-                  if not method.startswith('_')]
-        
-        # Executor should have some methods
-        self.assertIsInstance(methods, list)
-        
-        # Print available methods for debugging
-        print(f"Executor methods: {methods}")
-    
-    def test_executor_submit_if_available(self):
-        """Test executor submit method if available."""
-        if hasattr(self.executor, 'submit'):
+    def test_executor_context_manager(self):
+        """Test executor as context manager."""
+        with Executor(max_workers=2) as executor:
+            assert executor is not None
+            # Should be able to submit tasks
+            future = executor.submit(lambda: 42)
+            assert future.result() == 42
+
+    def test_executor_submit_basic(self):
+        """Test basic task submission."""
+        with Executor(max_workers=2) as executor:
             def simple_task():
-                return 42
+                return "task_completed"
             
-            try:
-                result = self.executor.submit(simple_task)
-                # The exact behavior depends on implementation
-                # This test just ensures submit doesn't crash
-                self.assertIsNotNone(result)
-            except Exception as e:
-                # If submit method exists but requires different parameters,
-                # that's expected behavior
-                print(f"Submit method exists but requires different usage: {e}")
+            future = executor.submit(simple_task)
+            result = future.result()
+            assert result == "task_completed"
 
+    def test_executor_submit_with_args(self):
+        """Test task submission with arguments."""
+        with Executor(max_workers=2) as executor:
+            def task_with_args(x, y, z=None):
+                return x + y + (z or 0)
+            
+            future = executor.submit(task_with_args, 10, 20, z=5)
+            result = future.result()
+            assert result == 35
 
-class TestExecutorTaskExecution(unittest.TestCase):
-    """Test task execution capabilities."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_simple_task_execution(self):
-        """Test execution of simple tasks."""
-        def simple_task(x):
-            return x * 2
+    def test_executor_multiple_tasks(self):
+        """Test submitting multiple tasks."""
+        with Executor(max_workers=4) as executor:
+            def square(x):
+                return x * x
+            
+            # Submit multiple tasks
+            futures = []
+            for i in range(10):
+                future = executor.submit(square, i)
+                futures.append(future)
+            
+            # Collect results
+            results = [future.result() for future in futures]
+            expected = [i * i for i in range(10)]
+            assert results == expected
+
+    def test_executor_map_functionality(self):
+        """Test executor map functionality if available."""
+        with Executor(max_workers=2) as executor:
+            def double(x):
+                return x * 2
+            
+            if hasattr(executor, 'map'):
+                results = list(executor.map(double, range(5)))
+                expected = [x * 2 for x in range(5)]
+                assert results == expected
+
+    def test_executor_shutdown(self):
+        """Test executor shutdown functionality."""
+        executor = Executor(max_workers=2)
         
-        # If executor has a map-like method, test it
-        if hasattr(self.executor, 'map'):
-            try:
-                data = [1, 2, 3, 4, 5]
-                results = self.executor.map(simple_task, data)
-                expected = [2, 4, 6, 8, 10]
-                self.assertEqual(sorted(results), sorted(expected))
-            except Exception as e:
-                print(f"Executor map method requires different usage: {e}")
-    
-    def test_concurrent_task_execution(self):
+        # Submit a task
+        future = executor.submit(lambda: "test")
+        result = future.result()
+        assert result == "test"
+        
+        # Shutdown
+        executor.shutdown(wait=True)
+        
+        # Should not be able to submit new tasks after shutdown
+        with pytest.raises((RuntimeError, Exception)):
+            executor.submit(lambda: "should_fail")
+
+    def test_executor_concurrent_tasks(self):
         """Test concurrent execution of tasks."""
-        def slow_task(duration):
-            time.sleep(duration)
-            return duration
-        
-        # If executor supports concurrent execution
-        if hasattr(self.executor, 'submit') or hasattr(self.executor, 'map'):
+        with Executor(max_workers=4) as executor:
+            def slow_task(duration, value):
+                time.sleep(duration)
+                return value
+            
             start_time = time.time()
             
-            try:
-                if hasattr(self.executor, 'map'):
-                    # Test with short durations to keep test fast
-                    durations = [0.01, 0.01, 0.01]
-                    results = self.executor.map(slow_task, durations)
-                    self.assertEqual(sorted(results), sorted(durations))
-                elif hasattr(self.executor, 'submit'):
-                    # Test individual task submission
-                    result = self.executor.submit(slow_task, 0.01)
-                    self.assertIsNotNone(result)
-                
-                end_time = time.time()
-                execution_time = end_time - start_time
-                
-                # Concurrent execution should be faster than sequential
-                print(f"Concurrent execution time: {execution_time:.4f}s")
-                
-            except Exception as e:
-                print(f"Concurrent execution test failed: {e}")
-
-
-class TestExecutorErrorHandling(unittest.TestCase):
-    """Test error handling in Executor."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_exception_in_task(self):
-        """Test handling of exceptions in tasks."""
-        def failing_task(x):
-            if x == 2:
-                raise ValueError("Test exception")
-            return x * 2
-        
-        if hasattr(self.executor, 'map'):
-            try:
-                data = [1, 2, 3]
-                # This should either handle the exception gracefully
-                # or propagate it in a controlled manner
-                results = self.executor.map(failing_task, data)
-                # If we get here, the executor handled the exception
-                print(f"Executor handled exception gracefully: {results}")
-            except Exception as e:
-                # If exception is propagated, that's also valid behavior
-                print(f"Executor propagated exception: {e}")
-                self.assertIsInstance(e, (ValueError, Exception))
-
-
-class TestExecutorResourceManagement(unittest.TestCase):
-    """Test resource management in Executor."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_executor_cleanup(self):
-        """Test executor cleanup and resource management."""
-        # If executor has cleanup methods
-        cleanup_methods = ['close', 'shutdown', 'cleanup', '__del__']
-        
-        for method in cleanup_methods:
-            if hasattr(self.executor, method):
-                try:
-                    getattr(self.executor, method)()
-                    print(f"Executor cleanup method '{method}' executed successfully")
-                    break
-                except Exception as e:
-                    print(f"Executor cleanup method '{method}' failed: {e}")
-    
-    def test_multiple_executors(self):
-        """Test creating multiple executor instances."""
-        executors = []
-        
-        try:
-            # Create multiple executors
-            for i in range(3):
-                executor = Executor()
-                executors.append(executor)
-                self.assertIsInstance(executor, Executor)
+            # Submit tasks that should run concurrently
+            futures = []
+            for i in range(4):
+                future = executor.submit(slow_task, 0.1, i)
+                futures.append(future)
             
-            print(f"Successfully created {len(executors)} executor instances")
+            # Collect results
+            results = [future.result() for future in futures]
+            end_time = time.time()
             
-        finally:
-            # Clean up executors
-            for executor in executors:
-                cleanup_methods = ['close', 'shutdown', 'cleanup']
-                for method in cleanup_methods:
-                    if hasattr(executor, method):
-                        try:
-                            getattr(executor, method)()
-                            break
-                        except Exception:
-                            pass
-
-
-class TestExecutorIntegration(unittest.TestCase):
-    """Test Executor integration with other components."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_executor_with_configuration(self):
-        """Test executor with configuration settings."""
-        from pyferris.config import get_worker_count, set_worker_count
-        
-        # Get current worker count
-        original_count = get_worker_count()
-        
-        try:
-            # Set a specific worker count
-            set_worker_count(4)
+            # Should complete in less time than sequential execution
+            execution_time = end_time - start_time
+            sequential_time = 0.1 * 4  # 4 tasks * 0.1 seconds each
             
-            # Create new executor (might respect configuration)
-            executor = Executor()
-            self.assertIsInstance(executor, Executor)
+            # Be more lenient with timing to avoid flaky tests
+            assert execution_time < sequential_time * 1.2  # Allow some overhead
+            assert results == [0, 1, 2, 3]
+
+    def test_executor_exception_handling(self):
+        """Test exception handling in executor."""
+        with Executor(max_workers=2) as executor:
+            def failing_task():
+                raise ValueError("Task failed")
             
-            # Test if executor respects configuration
-            if hasattr(executor, 'worker_count') or hasattr(executor, 'workers'):
-                print("Executor appears to have worker configuration")
-            
-        finally:
-            # Restore original configuration
-            set_worker_count(original_count)
-    
-    def test_executor_with_parallel_operations(self):
-        """Test executor alongside parallel operations."""
-        from pyferris import parallel_map
-        
-        def test_function(x):
-            return x ** 2
-        
-        data = list(range(10))
-        
-        # Test both executor and parallel operations
-        executor = Executor()
-        self.assertIsInstance(executor, Executor)
-        
-        # Test parallel_map still works
-        parallel_result = parallel_map(test_function, data)
-        expected = [x ** 2 for x in data]
-        self.assertEqual(sorted(parallel_result), sorted(expected))
-        
-        # If executor has similar functionality, test compatibility
-        if hasattr(executor, 'map'):
             try:
-                executor_result = executor.map(test_function, data)
-                self.assertEqual(sorted(executor_result), sorted(expected))
-                print("Executor and parallel operations produce consistent results")
-            except Exception as e:
-                print(f"Executor map method has different interface: {e}")
+                future = executor.submit(failing_task)
+                # Should raise the exception when getting result
+                with pytest.raises(ValueError, match="Task failed"):
+                    future.result()
+            except ValueError:
+                # If exception is raised immediately during submit, that's also acceptable
+                pass
 
-
-class TestExecutorPerformance(unittest.TestCase):
-    """Test Executor performance characteristics."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_executor_overhead(self):
-        """Test executor overhead compared to direct execution."""
-        def simple_computation(x):
-            return x * 2 + 1
-        
-        data = list(range(100))
-        
-        # Test direct execution time
-        start_time = time.time()
-        direct_results = [simple_computation(x) for x in data]
-        direct_time = time.time() - start_time
-        
-        # Test executor execution time (if available)
-        if hasattr(self.executor, 'map'):
-            try:
-                start_time = time.time()
-                executor_results = self.executor.map(simple_computation, data)
-                executor_time = time.time() - start_time
-                
-                # Verify results are correct
-                self.assertEqual(sorted(direct_results), sorted(executor_results))
-                
-                print(f"Direct execution time: {direct_time:.4f}s")
-                print(f"Executor execution time: {executor_time:.4f}s")
-                print(f"Overhead ratio: {executor_time/direct_time:.2f}x")
-                
-            except Exception as e:
-                print(f"Executor performance test failed: {e}")
-    
-    def test_executor_scalability(self):
-        """Test executor scalability with different data sizes."""
-        def cpu_task(n):
-            # Simple CPU-bound task
-            result = 0
-            for i in range(n % 100):
-                result += i
-            return result
-        
-        if hasattr(self.executor, 'map'):
-            try:
-                # Test with different data sizes
-                sizes = [10, 50, 100]
-                
-                for size in sizes:
-                    data = list(range(size))
-                    
-                    start_time = time.time()
-                    results = self.executor.map(cpu_task, data)
-                    end_time = time.time()
-                    
-                    execution_time = end_time - start_time
-                    
-                    # Verify correctness
-                    expected = [cpu_task(x) for x in data]
-                    self.assertEqual(sorted(results), sorted(expected))
-                    
-                    print(f"Size {size}: {execution_time:.4f}s")
-                    
-            except Exception as e:
-                print(f"Scalability test failed: {e}")
-
-
-class TestExecutorEdgeCases(unittest.TestCase):
-    """Test Executor edge cases and boundary conditions."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.executor = Executor()
-    
-    def test_empty_task_list(self):
-        """Test executor with empty task list."""
-        if hasattr(self.executor, 'map'):
-            try:
-                def dummy_task(x):
-                    return x
-                
-                results = self.executor.map(dummy_task, [])
-                self.assertEqual(results, [])
-                
-            except Exception as e:
-                print(f"Empty task list test failed: {e}")
-    
-    def test_single_task(self):
-        """Test executor with single task."""
-        if hasattr(self.executor, 'map'):
-            try:
-                def single_task(x):
-                    return x * 3
-                
-                results = self.executor.map(single_task, [5])
-                self.assertEqual(results, [15])
-                
-            except Exception as e:
-                print(f"Single task test failed: {e}")
-    
-    def test_executor_reuse(self):
-        """Test reusing executor for multiple operations."""
-        if hasattr(self.executor, 'map'):
-            try:
-                def task1(x):
+    def test_executor_different_worker_counts(self):
+        """Test executor with different worker counts."""
+        for worker_count in [1, 2, 4, 8]:
+            with Executor(max_workers=worker_count) as executor:
+                def simple_task(x):
                     return x + 1
                 
-                def task2(x):
-                    return x * 2
+                future = executor.submit(simple_task, 10)
+                result = future.result()
+                assert result == 11
+
+    def test_executor_task_cancellation(self):
+        """Test task cancellation if supported."""
+        with Executor(max_workers=2) as executor:
+            def long_running_task():
+                time.sleep(1.0)
+                return "completed"
+            
+            future = executor.submit(long_running_task)
+            
+            # Try to cancel (may not be supported)
+            if hasattr(future, 'cancel'):
+                cancelled = future.cancel()
+                if cancelled:
+                    assert future.cancelled()
+
+    def test_executor_as_completed(self):
+        """Test as_completed functionality if available."""
+        with Executor(max_workers=3) as executor:
+            def task_with_delay(delay, value):
+                time.sleep(delay)
+                return value
+            
+            # Submit tasks with different delays
+            futures = []
+            futures.append(executor.submit(task_with_delay, 0.1, "fast"))
+            futures.append(executor.submit(task_with_delay, 0.3, "slow"))
+            futures.append(executor.submit(task_with_delay, 0.2, "medium"))
+            
+            # Check if concurrent.futures.as_completed works
+            try:
+                completed_futures = []
+                for future in concurrent.futures.as_completed(futures, timeout=1.0):
+                    completed_futures.append(future.result())
                 
-                # First operation
-                results1 = self.executor.map(task1, [1, 2, 3])
-                self.assertEqual(sorted(results1), [2, 3, 4])
+                # All tasks should complete
+                assert len(completed_futures) == 3
+                assert set(completed_futures) == {"fast", "slow", "medium"}
+            except (AttributeError, NotImplementedError):
+                # as_completed might not be supported
+                pass
+
+    def test_executor_invalid_worker_count(self):
+        """Test executor with invalid worker count."""
+        # Zero workers is allowed in this implementation
+        try:
+            executor = Executor(max_workers=0)
+            executor.shutdown()  # Clean up
+        except Exception:
+            pass  # Some implementations might raise an error
+        
+        # Negative workers should raise an error
+        with pytest.raises((ValueError, OverflowError, Exception)):
+            Executor(max_workers=-1)
+
+    def test_executor_future_interface(self):
+        """Test that returned futures implement expected interface."""
+        with Executor(max_workers=2) as executor:
+            def simple_task():
+                return "result"
+            
+            future = executor.submit(simple_task)
+            
+            # Should have basic future methods
+            assert hasattr(future, 'result')
+            assert hasattr(future, 'done')
+            
+            # Should be done after getting result
+            result = future.result()
+            assert result == "result"
+            assert future.done()
+
+    def test_executor_timeout_handling(self):
+        """Test timeout handling in executor."""
+        with Executor(max_workers=2) as executor:
+            def slow_task():
+                time.sleep(0.5)
+                return "slow_result"
+            
+            future = executor.submit(slow_task)
+            
+            # Test timeout - may not be supported in all implementations
+            timeout_raised = False
+            try:
+                future.result(timeout=0.1)
+            except (TimeoutError, concurrent.futures.TimeoutError):
+                timeout_raised = True
+            except Exception:
+                pass  # Other exceptions are also acceptable
+            
+            # If no timeout was raised, just verify we can get the result
+            if not timeout_raised:
+                result = future.result(timeout=1.0)
+                assert result == "slow_result"
+            
+            # Should succeed with longer timeout
+            result = future.result(timeout=1.0)
+            assert result == "slow_result"
+
+    @pytest.mark.slow
+    def test_executor_stress_test(self):
+        """Test executor under stress with many tasks."""
+        with Executor(max_workers=4) as executor:
+            def cpu_task(n):
+                # Small CPU-intensive task
+                return sum(i * i for i in range(n))
+            
+            # Submit many tasks
+            futures = []
+            for i in range(100):
+                future = executor.submit(cpu_task, i + 10)
+                futures.append(future)
+            
+            # Collect all results
+            results = [future.result() for future in futures]
+            
+            # Verify results
+            expected = [sum(i * i for i in range(j + 10)) for j in range(100)]
+            assert results == expected
+
+    def test_executor_memory_management(self):
+        """Test that executor doesn't leak memory with many tasks."""
+        # This is a basic test - in practice you'd use memory profiling tools
+        with Executor(max_workers=2) as executor:
+            def simple_task(x):
+                return x * 2
+            
+            # Submit and complete many tasks
+            for i in range(1000):
+                future = executor.submit(simple_task, i)
+                result = future.result()
+                assert result == i * 2
                 
-                # Second operation with same executor
-                results2 = self.executor.map(task2, [1, 2, 3])
-                self.assertEqual(sorted(results2), [2, 4, 6])
+                # Delete future to help with cleanup
+                del future
+
+    def test_executor_thread_safety(self):
+        """Test that executor is thread-safe."""
+        import threading
+        
+        with Executor(max_workers=4) as executor:
+            results = []
+            results_lock = threading.Lock()
+            
+            def submit_tasks(start, end):
+                local_results = []
+                for i in range(start, end):
+                    future = executor.submit(lambda x: x * x, i)
+                    local_results.append(future.result())
                 
-                print("Executor successfully reused for multiple operations")
-                
-            except Exception as e:
-                print(f"Executor reuse test failed: {e}")
+                with results_lock:
+                    results.extend(local_results)
+            
+            # Submit tasks from multiple threads
+            threads = []
+            for i in range(4):
+                thread = threading.Thread(target=submit_tasks, args=(i * 10, (i + 1) * 10))
+                threads.append(thread)
+                thread.start()
+            
+            # Wait for all threads
+            for thread in threads:
+                thread.join()
+            
+            # Verify all results
+            assert len(results) == 40
+            expected = [i * i for i in range(40)]
+            assert sorted(results) == sorted(expected)
 
 
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+class TestExecutorEdgeCases:
+    """Test edge cases for executor."""
+
+    def test_executor_with_none_function(self):
+        """Test executor with None function."""
+        with Executor(max_workers=2) as executor:
+            with pytest.raises((TypeError, AttributeError)):
+                executor.submit(None)
+
+    def test_executor_with_non_callable(self):
+        """Test executor with non-callable object."""
+        with Executor(max_workers=2) as executor:
+            with pytest.raises((TypeError, AttributeError)):
+                executor.submit("not_callable")
+
+    def test_executor_reuse_after_shutdown(self):
+        """Test executor reuse after shutdown."""
+        executor = Executor(max_workers=2)
+        
+        # Use and shutdown
+        future = executor.submit(lambda: "test")
+        assert future.result() == "test"
+        executor.shutdown(wait=True)
+        
+        # Should not be able to reuse
+        with pytest.raises((RuntimeError, Exception)):
+            executor.submit(lambda: "should_fail")
+
+    def test_executor_large_return_values(self):
+        """Test executor with large return values."""
+        with Executor(max_workers=2) as executor:
+            def large_data_task():
+                # Return a moderately large list
+                return list(range(10000))
+            
+            future = executor.submit(large_data_task)
+            result = future.result()
+            assert len(result) == 10000
+            assert result == list(range(10000))
+
+    def test_executor_nested_submission(self):
+        """Test submitting tasks from within tasks."""
+        with Executor(max_workers=4) as executor:
+            def nested_task(x):
+                # Submit another task from within this task
+                inner_future = executor.submit(lambda y: y * 2, x)
+                return inner_future.result()
+            
+            future = executor.submit(nested_task, 5)
+            result = future.result()
+            assert result == 10
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])

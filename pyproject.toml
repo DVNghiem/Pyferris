@@ -40,3 +40,8 @@ build-backend = "maturin"
 module-name = 'pyferris._pyferris'
 bindings = 'pyo3'
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
