@@ -342,7 +342,6 @@ from pyferris.io.parallel_io import ParallelFileProcessor
 # Create processor with custom configuration
 processor = ParallelFileProcessor(
     max_workers=8,      # Use 8 worker threads
-    chunk_size=1000     # Process in chunks of 1000 items
 )
 
 # Parallel file operations

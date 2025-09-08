@@ -120,7 +120,6 @@ def circuit_breaker(
 def with_checkpoints(
     operation_id: str,
     checkpoint_dir: Optional[str] = None,
-    auto_save_interval: Optional[int] = 300,  # 5 minutes
     max_checkpoints: Optional[int] = 10,
     restore_on_start: bool = True
 ):
@@ -129,7 +128,6 @@ def with_checkpoints(
     Args:
         operation_id: Unique identifier for the operation
         checkpoint_dir: Directory to store checkpoints
-        auto_save_interval: Automatic checkpoint interval in seconds
         max_checkpoints: Maximum number of checkpoints to keep
         restore_on_start: Whether to restore from latest checkpoint on start
         
@@ -141,7 +139,6 @@ def with_checkpoints(
         def wrapper(*args, **kwargs):
             manager = CheckpointManager(
                 checkpoint_dir=checkpoint_dir,
-                auto_save_interval=auto_save_interval,
                 max_checkpoints=max_checkpoints
             )
             
@@ -205,7 +202,6 @@ class ResilientOperation:
         checkpoint_config = checkpoint_config or {}
         self.checkpoint_manager = CheckpointManager(
             checkpoint_dir=checkpoint_config.get('checkpoint_dir'),
-            auto_save_interval=checkpoint_config.get('auto_save_interval', 300),
             max_checkpoints=checkpoint_config.get('max_checkpoints', 10)
         )
         

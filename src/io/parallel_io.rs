@@ -9,14 +9,13 @@ use crate::error::ParallelExecutionError;
 #[pyclass]
 pub struct ParallelFileProcessor {
     max_workers: usize,
-    chunk_size: usize,
 }
 
 #[pymethods]
 impl ParallelFileProcessor {
     #[new]
-    #[pyo3(signature = (max_workers = 0, chunk_size = 1000))]
-    pub fn new(max_workers: usize, chunk_size: usize) -> Self {
+    #[pyo3(signature = (max_workers = 0))]
+    pub fn new(max_workers: usize) -> Self {
         let workers = if max_workers == 0 {
             rayon::current_num_threads()
         } else {
@@ -25,7 +24,6 @@ impl ParallelFileProcessor {
         
         Self {
             max_workers: workers,
-            chunk_size,
         }
     }
 

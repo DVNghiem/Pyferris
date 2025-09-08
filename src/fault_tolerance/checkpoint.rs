@@ -53,17 +53,15 @@ impl Checkpoint {
 #[derive(Clone)]
 pub struct CheckpointManager {
     checkpoint_dir: PathBuf,
-    auto_save_interval: Option<u64>,
     max_checkpoints: usize,
 }
 
 #[pymethods]
 impl CheckpointManager {
     #[new]
-    #[pyo3(signature = (checkpoint_dir, auto_save_interval=None, max_checkpoints=10))]
+    #[pyo3(signature = (checkpoint_dir, max_checkpoints=10))]
     pub fn new(
         checkpoint_dir: String,
-        auto_save_interval: Option<u64>,
         max_checkpoints: usize
     ) -> PyResult<Self> {
         let checkpoint_dir = PathBuf::from(checkpoint_dir);
@@ -76,7 +74,6 @@ impl CheckpointManager {
 
         Ok(Self {
             checkpoint_dir,
-            auto_save_interval,
             max_checkpoints,
         })
     }

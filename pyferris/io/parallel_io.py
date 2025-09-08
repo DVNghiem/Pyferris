@@ -20,8 +20,8 @@ __all__ = [
 
 class ParallelFileProcessor:
     """Parallel file operations for batch processing"""
-    
-    def __init__(self, max_workers: int = 0, chunk_size: int = 1000):
+
+    def __init__(self, max_workers: int = 0):
         """
         Initialize ParallelFileProcessor
         
@@ -29,7 +29,7 @@ class ParallelFileProcessor:
             max_workers: Maximum number of worker threads (0 = auto)
             chunk_size: Size of processing chunks
         """
-        self._processor = _pyferris.ParallelFileProcessor(max_workers, chunk_size)
+        self._processor = _pyferris.ParallelFileProcessor(max_workers)
     
     def process_files(self, file_paths: List[str], processor_func: Callable[[str, str], Any]) -> List[Any]:
         """Process multiple files in parallel with custom function"""
