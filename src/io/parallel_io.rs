@@ -1,9 +1,9 @@
+use crate::error::ParallelExecutionError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use rayon::prelude::*;
 use std::fs;
 use std::path::Path;
-use rayon::prelude::*;
-use crate::error::ParallelExecutionError;
 
 /// Parallel file operations for batch processing
 #[pyclass]
@@ -21,20 +21,27 @@ impl ParallelFileProcessor {
         } else {
             max_workers
         };
-        
+
         Self {
             max_workers: workers,
         }
     }
 
     /// Process multiple files in parallel with a custom function
-    pub fn process_files(&self, py: Python, file_paths: Vec<String>, processor_func: Py<PyAny>) -> PyResult<Py<PyList>> {
+    pub fn process_files(
+        &self,
+        py: Python,
+        file_paths: Vec<String>,
+        processor_func: Py<PyAny>,
+    ) -> PyResult<Py<PyList>> {
         // Set up thread pool if custom worker count is specified
         if self.max_workers != rayon::current_num_threads() {
             rayon::ThreadPoolBuilder::new()
                 .num_threads(self.max_workers)
                 .build_global()
-                .map_err(|e| ParallelExecutionError::new_err(format!("Failed to set thread pool: {}", e)))?;
+                .map_err(|e| {
+                    ParallelExecutionError::new_err(format!("Failed to set thread pool: {}", e))
+                })?;
         }
 
         // First, read all files in parallel (no GIL needed for file I/O)
@@ -47,18 +54,24 @@ impl ParallelFileProcessor {
             })
             .collect();
 
-        let file_contents = file_contents
-            .map_err(|e| ParallelExecutionError::new_err(e))?;
+        let file_contents = file_contents.map_err(|e| ParallelExecutionError::new_err(e))?;
 
         // Then process with Python function sequentially to avoid GIL deadlock
         let results: Result<Vec<_>, _> = py.detach(|| {
-            file_contents.into_iter().map(|(file_path, content)| {
-                Python::attach(|py| {
-                    let args = (file_path.as_str(), content.as_str());
-                    processor_func.call1(py, args)
-                        .map_err(|e| ParallelExecutionError::new_err(format!("Processor function failed for {}: {}", file_path, e)))
+            file_contents
+                .into_iter()
+                .map(|(file_path, content)| {
+                    Python::attach(|py| {
+                        let args = (file_path.as_str(), content.as_str());
+                        processor_func.call1(py, args).map_err(|e| {
+                            ParallelExecutionError::new_err(format!(
+                                "Processor function failed for {}: {}",
+                                file_path, e
+                            ))
+                        })
+                    })
                 })
-            }).collect::<Result<Vec<_>, _>>()
+                .collect::<Result<Vec<_>, _>>()
         });
 
         let results = results?;
@@ -67,7 +80,7 @@ impl ParallelFileProcessor {
         for result in results {
             py_results.append(result)?;
         }
-        
+
         Ok(py_results.into())
     }
 
@@ -76,20 +89,18 @@ impl ParallelFileProcessor {
         let results: Result<Vec<_>, _> = file_paths
             .par_iter()
             .map(|path| {
-                std::fs::read_to_string(path)
-                    .map_err(|e| format!("Failed to read {}: {}", path, e))
+                std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path, e))
             })
             .collect();
 
-        let results = results
-            .map_err(|e| ParallelExecutionError::new_err(e))?;
+        let results = results.map_err(|e| ParallelExecutionError::new_err(e))?;
 
         let py_results = PyList::empty(py);
         for (path, content) in file_paths.iter().zip(results.iter()) {
             let tuple = (path.as_str(), content.as_str());
             py_results.append(tuple)?;
         }
-        
+
         Ok(py_results.into())
     }
 
@@ -115,11 +126,12 @@ impl ParallelFileProcessor {
                 // Create destination directory if it doesn't exist
                 if let Some(parent) = Path::new(dst).parent() {
                     if !parent.exists() {
-                        fs::create_dir_all(parent)
-                            .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
+                        fs::create_dir_all(parent).map_err(|e| {
+                            format!("Failed to create directory {}: {}", parent.display(), e)
+                        })?;
                     }
                 }
-                
+
                 std::fs::copy(src, dst)
                     .map_err(|e| format!("Failed to copy {} to {}: {}", src, dst, e))
             })
@@ -130,18 +142,30 @@ impl ParallelFileProcessor {
     }
 
     /// Process directory recursively in parallel
-    pub fn process_directory(&self, py: Python, dir_path: &str, file_filter: Option<Py<PyAny>>, processor_func: Py<PyAny>) -> PyResult<Py<PyList>> {
+    pub fn process_directory(
+        &self,
+        py: Python,
+        dir_path: &str,
+        file_filter: Option<Py<PyAny>>,
+        processor_func: Py<PyAny>,
+    ) -> PyResult<Py<PyList>> {
         let paths = collect_files_recursive(dir_path)?;
-        
+
         // Filter files if filter function is provided
         let filtered_paths = if let Some(filter_func) = file_filter {
             // Apply filter sequentially to avoid GIL issues
             let mut filtered = Vec::new();
             for path in paths {
-                let should_include = filter_func.call1(py, (path.as_str(),))?
+                let should_include = filter_func
+                    .call1(py, (path.as_str(),))?
                     .extract::<bool>(py)
-                    .map_err(|e| ParallelExecutionError::new_err(format!("Filter function error for {}: {}", path, e)))?;
-                
+                    .map_err(|e| {
+                        ParallelExecutionError::new_err(format!(
+                            "Filter function error for {}: {}",
+                            path, e
+                        ))
+                    })?;
+
                 if should_include {
                     filtered.push(path);
                 }
@@ -155,27 +179,35 @@ impl ParallelFileProcessor {
     }
 
     /// Get file statistics in parallel
-    pub fn get_file_stats_parallel(&self, py: Python, file_paths: Vec<String>) -> PyResult<Py<PyList>> {
+    pub fn get_file_stats_parallel(
+        &self,
+        py: Python,
+        file_paths: Vec<String>,
+    ) -> PyResult<Py<PyList>> {
         let results: Result<Vec<_>, String> = file_paths
             .par_iter()
             .map(|path| {
                 let metadata = std::fs::metadata(path)
                     .map_err(|e| format!("Failed to get metadata for {}: {}", path, e))?;
-                
+
                 Ok((
                     path.clone(),
                     metadata.len(),
                     metadata.is_file(),
                     metadata.is_dir(),
-                    metadata.modified()
-                        .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+                    metadata
+                        .modified()
+                        .map(|t| {
+                            t.duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs()
+                        })
                         .unwrap_or(0),
                 ))
             })
             .collect();
 
-        let results = results
-            .map_err(|e| ParallelExecutionError::new_err(e))?;
+        let results = results.map_err(|e| ParallelExecutionError::new_err(e))?;
 
         let py_results = PyList::empty(py);
         for (path, size, is_file, is_dir, modified) in results {
@@ -187,7 +219,7 @@ impl ParallelFileProcessor {
             stats_dict.set_item("modified", modified)?;
             py_results.append(stats_dict)?;
         }
-        
+
         Ok(py_results.into())
     }
 }
@@ -201,13 +233,19 @@ fn collect_files_recursive(dir_path: &str) -> PyResult<Vec<String>> {
 
 fn collect_files_recursive_helper(dir: &Path, files: &mut Vec<String>) -> PyResult<()> {
     if dir.is_dir() {
-        let entries = fs::read_dir(dir)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read directory {}: {}", dir.display(), e)))?;
+        let entries = fs::read_dir(dir).map_err(|e| {
+            ParallelExecutionError::new_err(format!(
+                "Failed to read directory {}: {}",
+                dir.display(),
+                e
+            ))
+        })?;
 
         for entry in entries {
-            let entry = entry
-                .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read directory entry: {}", e)))?;
-            
+            let entry = entry.map_err(|e| {
+                ParallelExecutionError::new_err(format!("Failed to read directory entry: {}", e))
+            })?;
+
             let path = entry.path();
             if path.is_dir() {
                 collect_files_recursive_helper(&path, files)?;
@@ -227,10 +265,15 @@ fn collect_files_recursive_helper(dir: &Path, files: &mut Vec<String>) -> PyResu
 
 /// Process files in chunks with parallel execution
 #[pyfunction]
-pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usize, processor_func: Py<PyAny>) -> PyResult<Py<PyList>> {
+pub fn parallel_process_file_chunks(
+    py: Python,
+    file_path: &str,
+    chunk_size: usize,
+    processor_func: Py<PyAny>,
+) -> PyResult<Py<PyList>> {
     let content = std::fs::read_to_string(file_path)
         .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
-    
+
     let lines: Vec<&str> = content.lines().collect();
     let chunks: Vec<Vec<&str>> = lines
         .chunks(chunk_size)
@@ -246,10 +289,14 @@ pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usi
             for line in chunk {
                 chunk_lines.append(line)?;
             }
-            
+
             let args = (chunk_idx, &chunk_lines);
-            processor_func.call1(py, args)
-                .map_err(|e| ParallelExecutionError::new_err(format!("Processor function failed for chunk {}: {}", chunk_idx, e)))
+            processor_func.call1(py, args).map_err(|e| {
+                ParallelExecutionError::new_err(format!(
+                    "Processor function failed for chunk {}: {}",
+                    chunk_idx, e
+                ))
+            })
         })
         .collect();
 
@@ -259,7 +306,7 @@ pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usi
     for result in results {
         py_results.append(result)?;
     }
-    
+
     Ok(py_results.into())
 }
 
@@ -267,7 +314,7 @@ pub fn parallel_process_file_chunks(py: Python, file_path: &str, chunk_size: usi
 #[pyfunction]
 pub fn parallel_find_files(py: Python, root_dir: &str, pattern: &str) -> PyResult<Py<PyList>> {
     let all_files = collect_files_recursive(root_dir)?;
-    
+
     let matching_files: Vec<String> = all_files
         .par_iter()
         .filter(|path| {
@@ -275,7 +322,7 @@ pub fn parallel_find_files(py: Python, root_dir: &str, pattern: &str) -> PyResul
                 .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("");
-            
+
             // Simple pattern matching (can be extended for regex)
             if pattern.contains('*') {
                 let pattern_parts: Vec<&str> = pattern.split('*').collect();
@@ -295,7 +342,7 @@ pub fn parallel_find_files(py: Python, root_dir: &str, pattern: &str) -> PyResul
     for file_path in matching_files {
         py_results.append(file_path)?;
     }
-    
+
     Ok(py_results.into())
 }
 
@@ -303,7 +350,7 @@ pub fn parallel_find_files(py: Python, root_dir: &str, pattern: &str) -> PyResul
 #[pyfunction]
 pub fn parallel_directory_size(dir_path: &str) -> PyResult<u64> {
     let files = collect_files_recursive(dir_path)?;
-    
+
     let total_size: u64 = files
         .par_iter()
         .map(|path| {

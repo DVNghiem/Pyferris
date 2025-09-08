@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
-use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 /// A memory pool for efficient allocation and reuse of memory blocks
 #[pyclass]
@@ -25,24 +25,26 @@ impl MemoryPool {
 
     /// Allocate a memory block from the pool
     pub fn allocate(&self) -> PyResult<Vec<u8>> {
-        let mut pool = self.pool.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
-        
+        let mut pool = self
+            .pool
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
+
         if let Some(block) = pool.pop_front() {
             Ok(block)
         } else {
             // Create new block if pool is empty
-            let mut count = self.allocated_count.lock().map_err(|_| {
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-            })?;
-            
+            let mut count = self
+                .allocated_count
+                .lock()
+                .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
+
             if *count >= self.max_blocks {
                 return Err(PyErr::new::<pyo3::exceptions::PyMemoryError, _>(
-                    "Memory pool exhausted"
+                    "Memory pool exhausted",
                 ));
             }
-            
+
             *count += 1;
             Ok(vec![0u8; self.block_size])
         }
@@ -52,13 +54,14 @@ impl MemoryPool {
     pub fn deallocate(&self, mut block: Vec<u8>) -> PyResult<()> {
         if block.len() != self.block_size {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Block size mismatch"
+                "Block size mismatch",
             ));
         }
 
-        let mut pool = self.pool.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut pool = self
+            .pool
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
 
         if pool.len() < self.max_blocks / 2 {
             // Clear the block and return it to the pool
@@ -66,9 +69,10 @@ impl MemoryPool {
             pool.push_back(block);
         } else {
             // Pool is full, let the block be deallocated normally
-            let mut count = self.allocated_count.lock().map_err(|_| {
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-            })?;
+            let mut count = self
+                .allocated_count
+                .lock()
+                .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
             *count -= 1;
         }
 
@@ -77,17 +81,19 @@ impl MemoryPool {
 
     /// Get the number of available blocks in the pool
     pub fn available_blocks(&self) -> PyResult<usize> {
-        let pool = self.pool.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let pool = self
+            .pool
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(pool.len())
     }
 
     /// Get the total number of allocated blocks
     pub fn allocated_blocks(&self) -> PyResult<usize> {
-        let count = self.allocated_count.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let count = self
+            .allocated_count
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(*count)
     }
 
@@ -103,15 +109,17 @@ impl MemoryPool {
 
     /// Clear all blocks from the pool
     pub fn clear(&self) -> PyResult<()> {
-        let mut pool = self.pool.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut pool = self
+            .pool
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         let cleared_count = pool.len();
         pool.clear();
 
-        let mut count = self.allocated_count.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut count = self
+            .allocated_count
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         *count = (*count).saturating_sub(cleared_count);
 
         Ok(())
@@ -119,12 +127,14 @@ impl MemoryPool {
 
     /// Get memory usage statistics
     pub fn stats(&self, py: Python) -> PyResult<Py<PyAny>> {
-        let pool = self.pool.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
-        let count = self.allocated_count.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let pool = self
+            .pool
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
+        let count = self
+            .allocated_count
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
 
         let dict = pyo3::types::PyDict::new(py);
         dict.set_item("block_size", self.block_size)?;
@@ -133,14 +143,15 @@ impl MemoryPool {
         dict.set_item("available_blocks", pool.len())?;
         dict.set_item("total_memory_bytes", *count * self.block_size)?;
         dict.set_item("pool_memory_bytes", pool.len() * self.block_size)?;
-        
+
         Ok(dict.into())
     }
 
     fn __repr__(&self) -> PyResult<String> {
-        let count = self.allocated_count.lock().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let count = self
+            .allocated_count
+            .lock()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(format!(
             "MemoryPool(block_size={}, allocated={}, max_blocks={})",
             self.block_size, *count, self.max_blocks

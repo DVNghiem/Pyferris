@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
-use std::sync::{Arc, Mutex};
-use std::collections::VecDeque;
 use rayon::prelude::*;
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 /// Work-stealing scheduler for load balancing
 #[pyclass]
@@ -17,7 +17,7 @@ impl WorkStealingScheduler {
     pub fn new(workers: Option<usize>) -> Self {
         let num_workers = workers.unwrap_or_else(|| num_cpus::get());
         let work_queues = Arc::new(Mutex::new(vec![VecDeque::new(); num_workers]));
-        
+
         Self {
             workers: num_workers,
             work_queues,
@@ -30,7 +30,8 @@ impl WorkStealingScheduler {
             return Ok(Vec::new());
         }
 
-        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+        let task_objects: Vec<Arc<Py<PyAny>>> =
+            tasks.into_iter().map(|t| Arc::new(t.into())).collect();
 
         // Distribute tasks among work queues
         {
@@ -43,7 +44,8 @@ impl WorkStealingScheduler {
 
         // Execute tasks using rayon's work-stealing
         let results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
-            task_objects.par_iter()
+            task_objects
+                .par_iter()
                 .map(|task| {
                     Python::attach(|py| {
                         let bound_task = task.bind(py);
@@ -57,17 +59,24 @@ impl WorkStealingScheduler {
     }
 
     /// Execute tasks with custom work distribution
-    pub fn execute_with_distribution(&self, py: Python, tasks: Vec<Bound<PyAny>>, chunk_size: Option<usize>) -> PyResult<Vec<Py<PyAny>>> {
+    pub fn execute_with_distribution(
+        &self,
+        py: Python,
+        tasks: Vec<Bound<PyAny>>,
+        chunk_size: Option<usize>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
         if tasks.is_empty() {
             return Ok(Vec::new());
         }
 
         let chunk_size = chunk_size.unwrap_or(tasks.len() / self.workers.max(1));
-        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+        let task_objects: Vec<Arc<Py<PyAny>>> =
+            tasks.into_iter().map(|t| Arc::new(t.into())).collect();
 
         // Process in chunks with work-stealing
         let results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
-            task_objects.par_chunks(chunk_size)
+            task_objects
+                .par_chunks(chunk_size)
                 .flat_map(|chunk| {
                     chunk.par_iter().map(|task| {
                         Python::attach(|py| {
@@ -108,7 +117,7 @@ impl RoundRobinScheduler {
     #[pyo3(signature = (workers = None))]
     pub fn new(workers: Option<usize>) -> Self {
         let num_workers = workers.unwrap_or_else(|| num_cpus::get());
-        
+
         Self {
             workers: num_workers,
             current_worker: Arc::new(Mutex::new(0)),
@@ -121,8 +130,9 @@ impl RoundRobinScheduler {
             return Ok(Vec::new());
         }
 
-        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
-        
+        let task_objects: Vec<Arc<Py<PyAny>>> =
+            tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+
         // Group tasks by worker assignment
         let mut worker_tasks: Vec<Vec<Arc<Py<PyAny>>>> = vec![Vec::new(); self.workers];
         for (i, task) in task_objects.iter().enumerate() {
@@ -132,9 +142,11 @@ impl RoundRobinScheduler {
 
         // Execute tasks in parallel groups
         let results: PyResult<Vec<Vec<Py<PyAny>>>> = py.detach(|| {
-            worker_tasks.par_iter()
+            worker_tasks
+                .par_iter()
                 .map(|worker_task_group| {
-                    worker_task_group.iter()
+                    worker_task_group
+                        .iter()
                         .map(|task| {
                             Python::attach(|py| {
                                 let bound_task = task.bind(py);
@@ -149,7 +161,7 @@ impl RoundRobinScheduler {
         // Flatten results maintaining original order
         let mut final_results = Vec::new();
         let worker_results = results?;
-        
+
         // Rebuild in original order
         for i in 0..task_objects.len() {
             let worker_idx = i % self.workers;
@@ -192,7 +204,7 @@ impl AdaptiveScheduler {
     pub fn new(min_workers: Option<usize>, max_workers: Option<usize>) -> Self {
         let min_workers = min_workers.unwrap_or(1);
         let max_workers = max_workers.unwrap_or_else(|| num_cpus::get() * 2);
-        
+
         Self {
             min_workers,
             max_workers,
@@ -215,13 +227,15 @@ impl AdaptiveScheduler {
 
         // Store length before consuming tasks
         let task_count = tasks.len();
-        let task_objects: Vec<Arc<Py<PyAny>>> = tasks.into_iter().map(|t| Arc::new(t.into())).collect();
-        
+        let task_objects: Vec<Arc<Py<PyAny>>> =
+            tasks.into_iter().map(|t| Arc::new(t.into())).collect();
+
         // Use dynamic chunk size based on worker count and task size
         let chunk_size = (task_count / optimal_workers).max(1);
 
         let results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
-            task_objects.par_chunks(chunk_size)
+            task_objects
+                .par_chunks(chunk_size)
                 .flat_map(|chunk| {
                     chunk.par_iter().map(|task| {
                         Python::attach(|py| {

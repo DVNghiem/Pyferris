@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
-use std::sync::{Arc, Mutex};
-use std::collections::BinaryHeap;
-use std::cmp::Ordering;
 use rayon::prelude::*;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::sync::{Arc, Mutex};
 
 /// Task priority levels
 #[pyclass]
@@ -88,7 +88,7 @@ impl Ord for PriorityTask {
         // Higher priority first, then by id for stability
         match self.priority.cmp(&other.priority) {
             Ordering::Equal => other.id.cmp(&self.id), // Reverse order for FIFO within same priority
-            other => other, // Higher priority first
+            other => other,                            // Higher priority first
         }
     }
 }
@@ -107,7 +107,7 @@ impl PriorityScheduler {
     #[pyo3(signature = (workers = None))]
     pub fn new(workers: Option<usize>) -> Self {
         let num_workers = workers.unwrap_or_else(|| num_cpus::get());
-        
+
         Self {
             workers: num_workers,
             task_queue: Arc::new(Mutex::new(BinaryHeap::new())),
@@ -124,15 +124,19 @@ impl PriorityScheduler {
         drop(id_counter);
 
         let priority_task = PriorityTask::new(Arc::new(task.into()), priority, task_id);
-        
+
         let mut queue = self.task_queue.lock().unwrap();
         queue.push(priority_task);
-        
+
         Ok(task_id)
     }
 
     /// Execute tasks in priority order
-    pub fn execute(&self, py: Python, tasks_with_priorities: Vec<(Bound<PyAny>, Option<TaskPriority>)>) -> PyResult<Vec<Py<PyAny>>> {
+    pub fn execute(
+        &self,
+        py: Python,
+        tasks_with_priorities: Vec<(Bound<PyAny>, Option<TaskPriority>)>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
         if tasks_with_priorities.is_empty() {
             return Ok(Vec::new());
         }
@@ -165,7 +169,7 @@ impl PriorityScheduler {
                 }
                 current_priority = Some(priority_task.priority);
             }
-            
+
             group_indices.push(priority_task.id);
             priority_group.push(priority_task.task.clone());
         }
@@ -209,7 +213,7 @@ impl PriorityScheduler {
                 }
                 current_priority = Some(priority_task.priority);
             }
-            
+
             group_indices.push(priority_task.id);
             priority_group.push(priority_task.task.clone());
         }
@@ -253,7 +257,8 @@ impl PriorityScheduler {
     ) -> PyResult<()> {
         // Execute tasks in parallel within the same priority group
         let group_results: PyResult<Vec<Py<PyAny>>> = py.detach(|| {
-            tasks.par_iter()
+            tasks
+                .par_iter()
                 .map(|task| {
                     Python::attach(|py| {
                         let bound_task = task.bind(py);
@@ -264,7 +269,7 @@ impl PriorityScheduler {
         });
 
         let group_results = group_results?;
-        
+
         // Store results at their original indices
         for (i, &original_idx) in indices.iter().enumerate() {
             if let Some(result) = group_results.get(i) {
@@ -289,6 +294,9 @@ pub fn execute_with_priority(
 
 /// Helper function to create priority tasks
 #[pyfunction]
-pub fn create_priority_task(task: Bound<PyAny>, priority: Option<TaskPriority>) -> (Py<PyAny>, Option<TaskPriority>) {
+pub fn create_priority_task(
+    task: Bound<PyAny>,
+    priority: Option<TaskPriority>,
+) -> (Py<PyAny>, Option<TaskPriority>) {
     (task.into(), priority)
 }

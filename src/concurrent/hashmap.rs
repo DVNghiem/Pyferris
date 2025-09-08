@@ -1,7 +1,7 @@
+use dashmap::DashMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::sync::Arc;
-use dashmap::DashMap;
 
 /// A thread-safe, lock-free hash map implementation using DashMap
 #[pyclass]
@@ -60,12 +60,20 @@ impl ConcurrentHashMap {
 
     /// Get all values
     pub fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
-        Ok(self.inner.iter().map(|entry| entry.value().clone_ref(py)).collect())
+        Ok(self
+            .inner
+            .iter()
+            .map(|entry| entry.value().clone_ref(py))
+            .collect())
     }
 
     /// Get all key-value pairs as tuples
     pub fn items(&self, py: Python) -> PyResult<Vec<(String, Py<PyAny>)>> {
-        Ok(self.inner.iter().map(|entry| (entry.key().clone(), entry.value().clone_ref(py))).collect())
+        Ok(self
+            .inner
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone_ref(py)))
+            .collect())
     }
 
     /// Update with another dictionary
@@ -79,7 +87,11 @@ impl ConcurrentHashMap {
 
     /// Get with default value
     pub fn get_or_default(&self, py: Python, key: &str, default: Py<PyAny>) -> PyResult<Py<PyAny>> {
-        Ok(self.inner.get(key).map(|entry| entry.value().clone_ref(py)).unwrap_or(default))
+        Ok(self
+            .inner
+            .get(key)
+            .map(|entry| entry.value().clone_ref(py))
+            .unwrap_or(default))
     }
 
     /// Atomic get-or-insert operation
@@ -109,8 +121,9 @@ impl ConcurrentHashMap {
     }
 
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
-        self.get(py, key)?
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key)))
+        self.get(py, key)?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key))
+        })
     }
 
     fn __setitem__(&self, key: String, value: Py<PyAny>) -> PyResult<()> {
@@ -119,8 +132,9 @@ impl ConcurrentHashMap {
     }
 
     fn __delitem__(&self, key: &str) -> PyResult<()> {
-        self.remove(key)?
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key)))?;
+        self.remove(key)?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key))
+        })?;
         Ok(())
     }
 

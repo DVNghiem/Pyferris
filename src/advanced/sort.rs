@@ -188,31 +188,30 @@ pub fn parallel_partition(
     let predicate: Arc<Py<PyAny>> = Arc::new(predicate.into());
 
     // Process in parallel chunks
-    let (true_items, false_items): (Vec<Vec<Py<PyAny>>>, Vec<Vec<Py<PyAny>>>) =
-        py.detach(|| {
-            items
-                .par_chunks(chunk_size)
-                .map(|chunk| {
-                    Python::attach(|py| {
-                        let mut true_chunk = Vec::new();
-                        let mut false_chunk = Vec::new();
+    let (true_items, false_items): (Vec<Vec<Py<PyAny>>>, Vec<Vec<Py<PyAny>>>) = py.detach(|| {
+        items
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                Python::attach(|py| {
+                    let mut true_chunk = Vec::new();
+                    let mut false_chunk = Vec::new();
 
-                        for item in chunk {
-                            match predicate.call1(py, (item,)) {
-                                Ok(result) => match result.extract::<bool>(py) {
-                                    Ok(true) => true_chunk.push(item.clone_ref(py)),
-                                    Ok(false) => false_chunk.push(item.clone_ref(py)),
-                                    Err(_) => false_chunk.push(item.clone_ref(py)),
-                                },
+                    for item in chunk {
+                        match predicate.call1(py, (item,)) {
+                            Ok(result) => match result.extract::<bool>(py) {
+                                Ok(true) => true_chunk.push(item.clone_ref(py)),
+                                Ok(false) => false_chunk.push(item.clone_ref(py)),
                                 Err(_) => false_chunk.push(item.clone_ref(py)),
-                            }
+                            },
+                            Err(_) => false_chunk.push(item.clone_ref(py)),
                         }
+                    }
 
-                        (true_chunk, false_chunk)
-                    })
+                    (true_chunk, false_chunk)
                 })
-                .collect::<(Vec<_>, Vec<_>)>()
-        });
+            })
+            .collect::<(Vec<_>, Vec<_>)>()
+    });
 
     // Flatten results
     let true_result: Vec<Py<PyAny>> = true_items.into_iter().flatten().collect();

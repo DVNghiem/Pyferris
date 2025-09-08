@@ -1,10 +1,10 @@
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::collections::hash_map::DefaultHasher;
 
 /// Cache eviction policies
 #[pyclass]
@@ -27,25 +27,25 @@ impl EvictionPolicy {
     pub fn lru(_cls: &Bound<'_, PyType>) -> Self {
         EvictionPolicy::LRU
     }
-    
+
     /// Create LFU policy
     #[classmethod]
     pub fn lfu(_cls: &Bound<'_, PyType>) -> Self {
         EvictionPolicy::LFU
     }
-    
+
     /// Create TTL policy
     #[classmethod]
     pub fn ttl(_cls: &Bound<'_, PyType>) -> Self {
         EvictionPolicy::TTL
     }
-    
+
     /// Create Adaptive policy
     #[classmethod]
     pub fn adaptive(_cls: &Bound<'_, PyType>) -> Self {
         EvictionPolicy::Adaptive
     }
-    
+
     fn __repr__(&self) -> String {
         match self {
             EvictionPolicy::LRU => "EvictionPolicy.LRU".to_string(),
@@ -114,19 +114,18 @@ impl SmartCache {
     /// Find the key to evict based on the current policy
     fn find_eviction_key(&self, cache: &HashMap<u64, CacheEntry>) -> Option<u64> {
         match self.policy {
-            EvictionPolicy::LRU => {
-                cache.iter()
-                    .min_by_key(|(_, entry)| entry.last_accessed)
-                    .map(|(key, _)| *key)
-            }
-            EvictionPolicy::LFU => {
-                cache.iter()
-                    .min_by_key(|(_, entry)| entry.access_count)
-                    .map(|(key, _)| *key)
-            }
+            EvictionPolicy::LRU => cache
+                .iter()
+                .min_by_key(|(_, entry)| entry.last_accessed)
+                .map(|(key, _)| *key),
+            EvictionPolicy::LFU => cache
+                .iter()
+                .min_by_key(|(_, entry)| entry.access_count)
+                .map(|(key, _)| *key),
             EvictionPolicy::TTL => {
                 // Find oldest entry for TTL policy
-                cache.iter()
+                cache
+                    .iter()
                     .min_by_key(|(_, entry)| entry.created_at)
                     .map(|(key, _)| *key)
             }
@@ -138,15 +137,17 @@ impl SmartCache {
                 } else {
                     0.0
                 };
-                
+
                 if hit_rate > self.adaptive_threshold {
                     // High hit rate, use LFU to keep frequently accessed items
-                    cache.iter()
+                    cache
+                        .iter()
                         .min_by_key(|(_, entry)| entry.access_count)
                         .map(|(key, _)| *key)
                 } else {
                     // Low hit rate, use LRU to make room for new items
-                    cache.iter()
+                    cache
+                        .iter()
                         .min_by_key(|(_, entry)| entry.last_accessed)
                         .map(|(key, _)| *key)
                 }
@@ -177,10 +178,10 @@ impl SmartCache {
     /// Evict entries to make room for new ones
     fn evict_if_needed(&self, cache: &mut HashMap<u64, CacheEntry>) -> usize {
         let mut evicted = 0;
-        
+
         // First, evict expired entries
         evicted += self.evict_expired(cache);
-        
+
         // Then, evict based on policy if still over capacity
         while cache.len() >= self.max_size {
             if let Some(key) = self.find_eviction_key(cache) {
@@ -207,7 +208,7 @@ impl SmartCache {
         adaptive_threshold: f64,
     ) -> Self {
         let ttl = ttl_seconds.map(Duration::from_secs_f64);
-        
+
         Self {
             cache: Arc::new(Mutex::new(HashMap::new())),
             policy,
@@ -234,13 +235,13 @@ impl SmartCache {
         if let Some(entry) = cache.get_mut(&hash_key) {
             if !self.is_expired(entry) {
                 self.update_access(entry);
-                
+
                 // Update hit statistics
                 let mut stats = self.stats.lock().map_err(|_| {
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Stats lock poisoned")
                 })?;
                 stats.hits += 1;
-                
+
                 return Ok(Some(entry.value.clone_ref(py)));
             } else {
                 // Entry expired, remove it
@@ -253,7 +254,7 @@ impl SmartCache {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Stats lock poisoned")
         })?;
         stats.misses += 1;
-        
+
         Ok(None)
     }
 
@@ -274,7 +275,7 @@ impl SmartCache {
 
         // Check if we need to evict entries
         let evicted = self.evict_if_needed(&mut cache);
-        
+
         cache.insert(hash_key, entry);
 
         // Update statistics
@@ -314,7 +315,7 @@ impl SmartCache {
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Stats lock poisoned")
             })?;
             stats.current_size = cache.len();
-            
+
             Ok(Some(entry.value))
         } else {
             Ok(None)
@@ -350,14 +351,14 @@ impl SmartCache {
         let stats = self.stats.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Stats lock poisoned")
         })?;
-        
+
         let dict = pyo3::types::PyDict::new(py);
         dict.set_item("hits", stats.hits)?;
         dict.set_item("misses", stats.misses)?;
         dict.set_item("evictions", stats.evictions)?;
         dict.set_item("current_size", stats.current_size)?;
         dict.set_item("max_size", self.max_size)?;
-        
+
         let hit_rate = if stats.hits + stats.misses > 0 {
             stats.hits as f64 / (stats.hits + stats.misses) as f64
         } else {
@@ -373,9 +374,9 @@ impl SmartCache {
         let mut cache = self.cache.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Cache lock poisoned")
         })?;
-        
+
         let evicted = self.evict_expired(&mut cache);
-        
+
         // Update statistics
         let mut stats = self.stats.lock().map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Stats lock poisoned")

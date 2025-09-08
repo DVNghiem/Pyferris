@@ -29,8 +29,11 @@ impl Pipeline {
 
     /// Execute the pipeline on data
     pub fn execute(&self, py: Python, data: Bound<PyAny>) -> PyResult<Py<PyList>> {
-        let items: Vec<Py<PyAny>> = data.try_iter()?.map(|item| item.map(|i| i.into())).collect::<PyResult<Vec<_>>>()?;
-        
+        let items: Vec<Py<PyAny>> = data
+            .try_iter()?
+            .map(|item| item.map(|i| i.into()))
+            .collect::<PyResult<Vec<_>>>()?;
+
         if items.is_empty() || self.operations.is_empty() {
             return Ok(PyList::new(py, items)?.into());
         }
@@ -39,32 +42,33 @@ impl Pipeline {
         let chunk_size = self.chunk_size;
 
         // Process in parallel chunks
-        let results: Vec<Py<PyAny>> = py.detach(|| {
-            items
-                .par_chunks(chunk_size)
-                .map(|chunk| {
-                    Python::attach(|py| {
-                        let mut chunk_results = Vec::new();
-                        
-                        for item in chunk {
-                            let mut current_item = item.clone_ref(py);
-                            
-                            // Apply each operation in sequence
-                            for operation in &operations {
-                                let bound_op = operation.bind(py);
-                                let bound_item = current_item.bind(py);
-                                current_item = bound_op.call1((bound_item,))?.into();
+        let results: Vec<Py<PyAny>> = py
+            .detach(|| {
+                items
+                    .par_chunks(chunk_size)
+                    .map(|chunk| {
+                        Python::attach(|py| {
+                            let mut chunk_results = Vec::new();
+
+                            for item in chunk {
+                                let mut current_item = item.clone_ref(py);
+
+                                // Apply each operation in sequence
+                                for operation in &operations {
+                                    let bound_op = operation.bind(py);
+                                    let bound_item = current_item.bind(py);
+                                    current_item = bound_op.call1((bound_item,))?.into();
+                                }
+                                chunk_results.push(current_item);
                             }
-                            chunk_results.push(current_item);
-                        }
-                        Ok(chunk_results)
+                            Ok(chunk_results)
+                        })
                     })
-                })
-                .collect::<PyResult<Vec<_>>>()
-        })?
-        .into_iter()
-        .flatten()
-        .collect();
+                    .collect::<PyResult<Vec<_>>>()
+            })?
+            .into_iter()
+            .flatten()
+            .collect();
 
         let py_list = PyList::new(py, results)?;
         Ok(py_list.into())
@@ -114,20 +118,28 @@ impl Chain {
     /// Execute the chain on a single item
     pub fn execute_one(&self, py: Python, item: Bound<PyAny>) -> PyResult<Py<PyAny>> {
         let mut current_item: Py<PyAny> = item.into();
-        
+
         for operation in &self.operations {
             let bound_op = operation.bind(py);
             let bound_item = current_item.bind(py);
             current_item = bound_op.call1((bound_item,))?.into();
         }
-        
+
         Ok(current_item)
     }
 
     /// Execute the chain on multiple items in parallel
-    pub fn execute_many(&self, py: Python, data: Bound<PyAny>, chunk_size: Option<usize>) -> PyResult<Py<PyList>> {
-        let items: Vec<Py<PyAny>> = data.try_iter()?.map(|item| item.map(|i| i.into())).collect::<PyResult<Vec<_>>>()?;
-        
+    pub fn execute_many(
+        &self,
+        py: Python,
+        data: Bound<PyAny>,
+        chunk_size: Option<usize>,
+    ) -> PyResult<Py<PyList>> {
+        let items: Vec<Py<PyAny>> = data
+            .try_iter()?
+            .map(|item| item.map(|i| i.into()))
+            .collect::<PyResult<Vec<_>>>()?;
+
         if items.is_empty() || self.operations.is_empty() {
             return Ok(PyList::new(py, items)?.into());
         }
@@ -136,34 +148,35 @@ impl Chain {
         let operations = self.operations.clone();
 
         // Process in parallel chunks
-        let results: Vec<Py<PyAny>> = py.detach(|| {
-            items
-                .par_chunks(chunk_size)
-                .map(|chunk| {
-                    Python::attach(|py| {
-                        let mut chunk_results = Vec::new();
-                        
-                        for item in chunk {
-                            let mut current_item = item.clone_ref(py);
-                            
-                            // Apply each operation in sequence
-                            for operation in &operations {
-                                let bound_op = operation.bind(py);
-                                let bound_item = current_item.bind(py);
-                                current_item = bound_op.call1((bound_item,))?.into();
+        let results: Vec<Py<PyAny>> = py
+            .detach(|| {
+                items
+                    .par_chunks(chunk_size)
+                    .map(|chunk| {
+                        Python::attach(|py| {
+                            let mut chunk_results = Vec::new();
+
+                            for item in chunk {
+                                let mut current_item = item.clone_ref(py);
+
+                                // Apply each operation in sequence
+                                for operation in &operations {
+                                    let bound_op = operation.bind(py);
+                                    let bound_item = current_item.bind(py);
+                                    current_item = bound_op.call1((bound_item,))?.into();
+                                }
+
+                                chunk_results.push(current_item);
                             }
-                            
-                            chunk_results.push(current_item);
-                        }
-                        
-                        Ok(chunk_results)
+
+                            Ok(chunk_results)
+                        })
                     })
-                })
-                .collect::<PyResult<Vec<_>>>()
-        })?
-        .into_iter()
-        .flatten()
-        .collect();
+                    .collect::<PyResult<Vec<_>>>()
+            })?
+            .into_iter()
+            .flatten()
+            .collect();
 
         let py_list = PyList::new(py, results)?;
         Ok(py_list.into())
@@ -184,8 +197,11 @@ pub fn pipeline_map(
     operations: Bound<PyList>,
     chunk_size: Option<usize>,
 ) -> PyResult<Py<PyList>> {
-    let items: Vec<Py<PyAny>> = data.try_iter()?.map(|item| item.map(|i| i.into())).collect::<PyResult<Vec<_>>>()?;
-    
+    let items: Vec<Py<PyAny>> = data
+        .try_iter()?
+        .map(|item| item.map(|i| i.into()))
+        .collect::<PyResult<Vec<_>>>()?;
+
     if items.is_empty() {
         return Ok(PyList::empty(py).into());
     }
@@ -198,34 +214,35 @@ pub fn pipeline_map(
     let chunk_size = chunk_size.unwrap_or(1000);
 
     // Process in parallel chunks
-    let results: Vec<Py<PyAny>> = py.detach(|| {
-        items
-            .par_chunks(chunk_size)
-            .map(|chunk| {
-                Python::attach(|py| {
-                    let mut chunk_results = Vec::new();
-                    
-                    for item in chunk {
-                        let mut current_item = item.clone_ref(py);
-                        
-                        // Apply each operation in sequence
-                        for operation in &ops {
-                            let bound_op = operation.bind(py);
-                            let bound_item = current_item.bind(py);
-                            current_item = bound_op.call1((bound_item,))?.into();
+    let results: Vec<Py<PyAny>> = py
+        .detach(|| {
+            items
+                .par_chunks(chunk_size)
+                .map(|chunk| {
+                    Python::attach(|py| {
+                        let mut chunk_results = Vec::new();
+
+                        for item in chunk {
+                            let mut current_item = item.clone_ref(py);
+
+                            // Apply each operation in sequence
+                            for operation in &ops {
+                                let bound_op = operation.bind(py);
+                                let bound_item = current_item.bind(py);
+                                current_item = bound_op.call1((bound_item,))?.into();
+                            }
+
+                            chunk_results.push(current_item);
                         }
-                        
-                        chunk_results.push(current_item);
-                    }
-                    
-                    Ok(chunk_results)
+
+                        Ok(chunk_results)
+                    })
                 })
-            })
-            .collect::<PyResult<Vec<_>>>()
-    })?
-    .into_iter()
-    .flatten()
-    .collect();
+                .collect::<PyResult<Vec<_>>>()
+        })?
+        .into_iter()
+        .flatten()
+        .collect();
 
     let py_list = PyList::new(py, results)?;
     Ok(py_list.into())

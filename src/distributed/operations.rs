@@ -18,7 +18,7 @@ impl DistributedBatchProcessor {
     pub fn new(cluster: ClusterManager, batch_size: Option<usize>) -> Self {
         let batch_size = batch_size.unwrap_or(100);
         let executor = DistributedExecutor::new(&cluster, None);
-        
+
         Self {
             batch_size,
             executor,
@@ -31,7 +31,7 @@ impl DistributedBatchProcessor {
         py: Python<'_>,
         function: Bound<'_, PyFunction>,
         data: Bound<'_, PyList>,
-        progress_callback: Option<Bound<'_, PyFunction>>
+        progress_callback: Option<Bound<'_, PyFunction>>,
     ) -> PyResult<Vec<Py<PyAny>>> {
         let total_items = data.len();
         let mut all_results = Vec::new();
@@ -40,13 +40,9 @@ impl DistributedBatchProcessor {
         // Process in batches
         for chunk in data.iter().collect::<Vec<_>>().chunks(self.batch_size) {
             let chunk_list = PyList::new(py, chunk.iter().cloned())?;
-            
-            let task_ids = self.executor.submit_batch(
-                &function, 
-                &chunk_list, 
-                None
-            )?;
-            
+
+            let task_ids = self.executor.submit_batch(&function, &chunk_list, None)?;
+
             // Wait for results and collect them
             for task_id in task_ids {
                 if let Some(result_str) = self.executor.get_result(task_id, Some(30.0))? {
@@ -55,9 +51,9 @@ impl DistributedBatchProcessor {
                     all_results.push(py.eval(result_cstr.as_c_str(), None, None)?.unbind());
                 }
             }
-            
+
             processed += chunk.len();
-            
+
             // Call progress callback if provided
             if let Some(callback) = &progress_callback {
                 let progress = processed as f64 / total_items as f64;

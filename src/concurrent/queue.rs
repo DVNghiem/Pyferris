@@ -1,8 +1,11 @@
+use crossbeam::queue::SegQueue;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::sync::{Arc, RwLock, atomic::{AtomicI64, Ordering}};
-use crossbeam::queue::SegQueue;
 use std::collections::HashMap;
+use std::sync::{
+    Arc, RwLock,
+    atomic::{AtomicI64, Ordering},
+};
 
 /// A lock-free queue implementation using crossbeam
 #[pyclass]
@@ -113,7 +116,8 @@ impl AtomicCounter {
 
     /// Compare and swap - atomically sets new value if current equals expected
     pub fn compare_and_swap(&self, expected: i64, new: i64) -> i64 {
-        self.inner.compare_exchange(expected, new, Ordering::SeqCst, Ordering::SeqCst)
+        self.inner
+            .compare_exchange(expected, new, Ordering::SeqCst, Ordering::SeqCst)
             .unwrap_or_else(|x| x)
     }
 
@@ -167,90 +171,104 @@ impl RwLockDict {
 
     /// Get a value by key (allows concurrent reads)
     pub fn get(&self, py: Python, key: &str) -> PyResult<Option<Py<PyAny>>> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.get(key).map(|v| v.clone_ref(py)))
     }
 
     /// Insert a key-value pair (exclusive write access)
     pub fn insert(&self, key: String, value: Py<PyAny>) -> PyResult<Option<Py<PyAny>>> {
-        let mut map = self.inner.write().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut map = self
+            .inner
+            .write()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.insert(key, value))
     }
 
     /// Remove a key-value pair (exclusive write access)
     pub fn remove(&self, key: &str) -> PyResult<Option<Py<PyAny>>> {
-        let mut map = self.inner.write().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut map = self
+            .inner
+            .write()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.remove(key))
     }
 
     /// Check if a key exists (allows concurrent reads)
     pub fn contains_key(&self, key: &str) -> PyResult<bool> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.contains_key(key))
     }
 
     /// Get the number of entries (allows concurrent reads)
     pub fn len(&self) -> PyResult<usize> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.len())
     }
 
     /// Check if the dictionary is empty (allows concurrent reads)
     pub fn is_empty(&self) -> PyResult<bool> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.is_empty())
     }
 
     /// Clear all entries (exclusive write access)
     pub fn clear(&self) -> PyResult<()> {
-        let mut map = self.inner.write().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut map = self
+            .inner
+            .write()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         map.clear();
         Ok(())
     }
 
     /// Get all keys (allows concurrent reads)
     pub fn keys(&self) -> PyResult<Vec<String>> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.keys().cloned().collect())
     }
 
     /// Get all values (allows concurrent reads)
     pub fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.values().map(|v| v.clone_ref(py)).collect())
     }
 
     /// Get all key-value pairs as tuples (allows concurrent reads)
     pub fn items(&self, py: Python) -> PyResult<Vec<(String, Py<PyAny>)>> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
-        Ok(map.iter().map(|(k, v)| (k.clone(), v.clone_ref(py))).collect())
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
+        Ok(map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone_ref(py)))
+            .collect())
     }
 
     /// Update with another dictionary (exclusive write access)
     pub fn update(&self, other: &Bound<PyDict>) -> PyResult<()> {
-        let mut map = self.inner.write().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let mut map = self
+            .inner
+            .write()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         for (key, value) in other.iter() {
             let key_str: String = key.extract()?;
             map.insert(key_str, value.unbind());
@@ -260,9 +278,10 @@ impl RwLockDict {
 
     /// Get with default value (allows concurrent reads)
     pub fn get_or_default(&self, py: Python, key: &str, default: Py<PyAny>) -> PyResult<Py<PyAny>> {
-        let map = self.inner.read().map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned")
-        })?;
+        let map = self
+            .inner
+            .read()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>("Lock poisoned"))?;
         Ok(map.get(key).map(|v| v.clone_ref(py)).unwrap_or(default))
     }
 
@@ -282,8 +301,9 @@ impl RwLockDict {
     }
 
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
-        self.get(py, key)?
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key)))
+        self.get(py, key)?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key))
+        })
     }
 
     fn __setitem__(&self, key: String, value: Py<PyAny>) -> PyResult<()> {
@@ -292,8 +312,9 @@ impl RwLockDict {
     }
 
     fn __delitem__(&self, key: &str) -> PyResult<()> {
-        self.remove(key)?
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key)))?;
+        self.remove(key)?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key))
+        })?;
         Ok(())
     }
 

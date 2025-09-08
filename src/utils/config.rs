@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Once;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 static WORKER_COUNT: AtomicUsize = AtomicUsize::new(0);
 static CHUNK_SIZE: AtomicUsize = AtomicUsize::new(1000);
@@ -15,13 +15,16 @@ fn init_thread_pool() {
         } else {
             worker_count
         };
-        
+
         if let Err(e) = rayon::ThreadPoolBuilder::new()
             .num_threads(count)
             .thread_name(|i| format!("pyferris-{}", i))
             .build_global()
         {
-            eprintln!("Warning: Failed to initialize custom thread pool: {}. Using default rayon pool.", e);
+            eprintln!(
+                "Warning: Failed to initialize custom thread pool: {}. Using default rayon pool.",
+                e
+            );
         }
     });
 }
@@ -31,15 +34,15 @@ fn init_thread_pool() {
 pub fn set_worker_count(count: usize) -> PyResult<()> {
     if count == 0 {
         return Err(pyo3::exceptions::PyValueError::new_err(
-            "Worker count must be greater than 0"
+            "Worker count must be greater than 0",
         ));
     }
-    
+
     WORKER_COUNT.store(count, Ordering::SeqCst);
-    
+
     // Initialize thread pool if not already done
     init_thread_pool();
-    
+
     Ok(())
 }
 
@@ -59,10 +62,10 @@ pub fn get_worker_count() -> usize {
 pub fn set_chunk_size(size: usize) -> PyResult<()> {
     if size == 0 {
         return Err(pyo3::exceptions::PyValueError::new_err(
-            "Chunk size must be greater than 0"
+            "Chunk size must be greater than 0",
         ));
     }
-    
+
     CHUNK_SIZE.store(size, Ordering::SeqCst);
     Ok(())
 }

@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use rayon::prelude::*;
-use std::sync::Arc;
 use smallvec::SmallVec;
+use std::sync::Arc;
 
 /// Parallel filter implementation with advanced Rust optimizations
 #[pyfunction]
@@ -16,7 +16,7 @@ pub fn parallel_filter(
     let items: Vec<Py<PyAny>> = {
         let iter = iterable.try_iter()?;
         let mut items = Vec::new();
-        
+
         // Try to get size hint for better allocation
         let (lower, upper) = iter.size_hint();
         if let Some(upper) = upper {
@@ -24,21 +24,21 @@ pub fn parallel_filter(
         } else if lower > 0 {
             items.reserve(lower);
         }
-        
+
         for item in iter {
             items.push(item?.into());
         }
         items
     };
-    
+
     if items.is_empty() {
         return Ok(PyList::empty(py).into());
     }
-    
+
     let chunk_size = chunk_size.unwrap_or_else(|| {
         let len = items.len();
         let num_threads = rayon::current_num_threads();
-        
+
         // Advanced chunking strategy based on dataset characteristics
         match len {
             0..=1000 => len.max(1), // Sequential for tiny datasets
@@ -49,7 +49,7 @@ pub fn parallel_filter(
     });
 
     let predicate: Arc<Py<PyAny>> = Arc::new(predicate.into());
-    
+
     // Use thread-local storage for better performance
     let filtered_results: Vec<SmallVec<[Py<PyAny>; 8]>> = py.detach(|| {
         // Use try_fold for better error handling and performance
@@ -60,11 +60,11 @@ pub fn parallel_filter(
                     // Use SmallVec for small chunks to avoid heap allocation
                     let mut chunk_results = SmallVec::new();
                     let bound_predicate = predicate.bind(py);
-                    
+
                     // Optimize inner loop with minimal allocations
                     for item in chunk {
                         let bound_item = item.bind(py);
-                        
+
                         // Fast path for common cases
                         match bound_predicate.call1((bound_item,)) {
                             Ok(result) => {
@@ -89,14 +89,14 @@ pub fn parallel_filter(
                 })
             })
             .collect();
-        
+
         chunk_results
     })?;
 
     // Flatten with capacity hint for better performance
     let total_capacity: usize = filtered_results.iter().map(|v| v.len()).sum();
     let mut final_results = Vec::with_capacity(total_capacity);
-    
+
     for chunk in filtered_results {
         final_results.extend(chunk);
     }

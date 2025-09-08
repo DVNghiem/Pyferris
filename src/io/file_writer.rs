@@ -1,9 +1,9 @@
+use crate::error::ParallelExecutionError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList};
+use rayon::prelude::*;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
-use rayon::prelude::*;
-use crate::error::ParallelExecutionError;
 
 /// High-performance file writer with parallel processing capabilities
 #[pyclass]
@@ -41,8 +41,9 @@ impl FileWriter {
         }
         .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
 
-        file.write_all(content.as_bytes())
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write to file: {}", e)))?;
+        file.write_all(content.as_bytes()).map_err(|e| {
+            ParallelExecutionError::new_err(format!("Failed to write to file: {}", e))
+        })?;
 
         Ok(())
     }
@@ -63,8 +64,9 @@ impl FileWriter {
         }
         .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
 
-        file.write_all(content.as_bytes())
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write to file: {}", e)))?;
+        file.write_all(content.as_bytes()).map_err(|e| {
+            ParallelExecutionError::new_err(format!("Failed to write to file: {}", e))
+        })?;
 
         Ok(())
     }
@@ -88,15 +90,18 @@ impl FileWriter {
         let mut writer = BufWriter::with_capacity(self.buffer_size, file);
 
         for item in lines.iter() {
-            let line: String = item.extract()
-                .map_err(|e| ParallelExecutionError::new_err(format!("Failed to extract line: {}", e)))?;
-            
-            writeln!(writer, "{}", line)
-                .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write line: {}", e)))?;
+            let line: String = item.extract().map_err(|e| {
+                ParallelExecutionError::new_err(format!("Failed to extract line: {}", e))
+            })?;
+
+            writeln!(writer, "{}", line).map_err(|e| {
+                ParallelExecutionError::new_err(format!("Failed to write line: {}", e))
+            })?;
         }
 
-        writer.flush()
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to flush buffer: {}", e)))?;
+        writer.flush().map_err(|e| {
+            ParallelExecutionError::new_err(format!("Failed to flush buffer: {}", e))
+        })?;
 
         Ok(())
     }
@@ -109,8 +114,9 @@ impl FileWriter {
             .open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
 
-        file.write_all(content.as_bytes())
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to append to file: {}", e)))?;
+        file.write_all(content.as_bytes()).map_err(|e| {
+            ParallelExecutionError::new_err(format!("Failed to append to file: {}", e))
+        })?;
 
         Ok(())
     }
@@ -123,8 +129,9 @@ impl FileWriter {
             .open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
 
-        writeln!(file, "{}", line)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to append line: {}", e)))?;
+        writeln!(file, "{}", line).map_err(|e| {
+            ParallelExecutionError::new_err(format!("Failed to append line: {}", e))
+        })?;
 
         Ok(())
     }
@@ -163,8 +170,7 @@ pub fn parallel_write_files(file_data: Vec<(String, String)>) -> PyResult<()> {
     let results: Result<Vec<_>, _> = file_data
         .par_iter()
         .map(|(path, content)| {
-            std::fs::write(path, content)
-                .map_err(|e| format!("Failed to write {}: {}", path, e))
+            std::fs::write(path, content).map_err(|e| format!("Failed to write {}: {}", path, e))
         })
         .collect();
 

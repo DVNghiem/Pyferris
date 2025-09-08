@@ -1,9 +1,9 @@
+use crate::error::ParallelExecutionError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString};
+use rayon::prelude::*;
 use std::io::Write;
 use std::path::Path;
-use rayon::prelude::*;
-use crate::error::ParallelExecutionError;
 
 /// Simple file reader
 #[pyclass]
@@ -28,14 +28,14 @@ impl SimpleFileReader {
     pub fn read_lines(&self, py: Python) -> PyResult<Py<PyList>> {
         let content = std::fs::read_to_string(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
-        
+
         let lines: Vec<&str> = content.lines().collect();
         let py_list = PyList::empty(py);
-        
+
         for line in lines {
             py_list.append(PyString::new(py, line))?;
         }
-        
+
         Ok(py_list.into())
     }
 }
@@ -68,8 +68,9 @@ impl SimpleFileWriter {
             .open(&self.file_path)
             .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
 
-        file.write_all(content.as_bytes())
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to append to file: {}", e)))
+        file.write_all(content.as_bytes()).map_err(|e| {
+            ParallelExecutionError::new_err(format!("Failed to append to file: {}", e))
+        })
     }
 }
 
@@ -93,19 +94,17 @@ pub fn simple_parallel_read_files(py: Python, file_paths: Vec<String>) -> PyResu
     let results: Result<Vec<_>, _> = file_paths
         .par_iter()
         .map(|path| {
-            std::fs::read_to_string(path)
-                .map_err(|e| format!("Failed to read {}: {}", path, e))
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path, e))
         })
         .collect();
 
-    let results = results
-        .map_err(|e| ParallelExecutionError::new_err(e))?;
+    let results = results.map_err(|e| ParallelExecutionError::new_err(e))?;
 
     let py_results = PyList::empty(py);
     for result in results {
         py_results.append(PyString::new(py, &result))?;
     }
-    
+
     Ok(py_results.into())
 }
 
@@ -115,8 +114,7 @@ pub fn simple_parallel_write_files(file_data: Vec<(String, String)>) -> PyResult
     let results: Result<Vec<_>, _> = file_data
         .par_iter()
         .map(|(path, content)| {
-            std::fs::write(path, content)
-                .map_err(|e| format!("Failed to write {}: {}", path, e))
+            std::fs::write(path, content).map_err(|e| format!("Failed to write {}: {}", path, e))
         })
         .collect();
 
@@ -133,9 +131,10 @@ pub fn simple_file_exists(file_path: &str) -> bool {
 /// Get file size in bytes
 #[pyfunction]
 pub fn simple_get_file_size(file_path: &str) -> PyResult<u64> {
-    let metadata = std::fs::metadata(file_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to get file metadata: {}", e)))?;
-    
+    let metadata = std::fs::metadata(file_path).map_err(|e| {
+        ParallelExecutionError::new_err(format!("Failed to get file metadata: {}", e))
+    })?;
+
     Ok(metadata.len())
 }
 

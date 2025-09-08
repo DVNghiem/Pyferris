@@ -3,6 +3,7 @@ PyFerris - High-performance parallel processing library for Python, powered by R
 """
 
 __version__ = "0.3.1"
+
 from .core import parallel_map, parallel_reduce, parallel_filter, parallel_starmap
 from .config import Config, get_chunk_size, get_worker_count, set_chunk_size, set_worker_count
 from .executor import Executor
@@ -27,7 +28,6 @@ from .scheduler import (
 # Level 4: Expert Features
 from .concurrent import ConcurrentHashMap, LockFreeQueue, AtomicCounter, RwLockDict
 from .memory import MemoryPool, memory_mapped_array, memory_mapped_array_2d, memory_mapped_info, create_temp_mmap
-from .profiling import Profiler, auto_tune_workers, profile_parallel_operation
 from .cache import SmartCache, EvictionPolicy, cached
 
 # Level 5: Enterprise Features
@@ -35,10 +35,6 @@ from .distributed import (
     DistributedCluster, create_cluster, distributed_map, distributed_filter,
     async_distributed_map, ClusterManager, LoadBalancer, DistributedExecutor,
     DistributedBatchProcessor, cluster_map, distributed_reduce
-)
-from .fault_tolerance import (
-    RetryExecutor, CircuitBreaker, CheckpointManager, AutoCheckpoint,
-    retry, circuit_breaker, with_checkpoints, resilient_operation, ResilientOperation
 )
 
 # Auto Garbage Collection System
@@ -128,12 +124,7 @@ __all__ = [
     "memory_mapped_array_2d",
     "memory_mapped_info",
     "create_temp_mmap",
-    
-    # Level 4: Performance Profiling
-    "Profiler",
-    "auto_tune_workers",
-    "profile_parallel_operation",
-    
+        
     # Level 4: Smart Cache
     "SmartCache",
     "EvictionPolicy",
@@ -151,17 +142,6 @@ __all__ = [
     "DistributedBatchProcessor",
     "cluster_map",
     "distributed_reduce",
-    
-    # Level 5: Fault Tolerance
-    "RetryExecutor",
-    "CircuitBreaker",
-    "CheckpointManager", 
-    "AutoCheckpoint",
-    "retry",
-    "circuit_breaker",
-    "with_checkpoints",
-    "resilient_operation",
-    "ResilientOperation",
     
     # Auto Garbage Collection
     "AutoGCConfig",
