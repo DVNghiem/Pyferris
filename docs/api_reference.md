@@ -432,7 +432,7 @@ Process file in chunks with parallel execution.
 
 #### Classes
 
-##### `ParallelFileProcessor(max_workers=0, chunk_size=1000)`
+##### `ParallelFileProcessor(max_workers=0)`
 Parallel file operations for batch processing.
 
 **Methods:**

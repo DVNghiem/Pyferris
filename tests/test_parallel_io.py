@@ -49,7 +49,7 @@ class TestParallelFileProcessor(unittest.TestCase):
     
     def test_parallel_file_processor_with_parameters(self):
         """Test ParallelFileProcessor with custom parameters."""
-        processor = ParallelFileProcessor(max_workers=4, chunk_size=500)
+        processor = ParallelFileProcessor(max_workers=4)
         self.assertIsInstance(processor, ParallelFileProcessor)
     
     def test_read_files_parallel(self):

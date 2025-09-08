@@ -201,7 +201,7 @@ def demonstrate_parallel_operations():
         print(f"Directory size: {dir_size} bytes")
         
         # Using ParallelFileProcessor class
-        processor = pio.ParallelFileProcessor(max_workers=4, chunk_size=2)
+        processor = pio.ParallelFileProcessor(max_workers=4)
         
         # Get file statistics in parallel
         stats = processor.get_file_stats_parallel(file_paths)

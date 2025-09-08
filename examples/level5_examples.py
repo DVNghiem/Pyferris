@@ -144,7 +144,6 @@ def example_checkpointing():
     @with_checkpoints(
         operation_id="large_dataset_processing",
         checkpoint_dir="./checkpoints",
-        auto_save_interval=2  # Save every 2 seconds for demo
     )
     def process_large_dataset(
         data: List[int], 
@@ -216,7 +215,6 @@ def example_resilient_operation():
         },
         checkpoint_config={
             'checkpoint_dir': './checkpoints',
-            'auto_save_interval': 5
         }
     )
     def critical_data_pipeline(data: List[int]) -> Dict[str, Any]:

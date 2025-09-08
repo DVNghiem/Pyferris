@@ -5,7 +5,7 @@ This module provides asynchronous parallel processing capabilities,
 allowing for efficient handling of I/O-bound and CPU-bound tasks.
 """
 
-from typing import Any, List, Callable, Optional
+from typing import Any, List, Callable
 from ._pyferris import (
     AsyncExecutor as _AsyncExecutor,
     AsyncTask as _AsyncTask, 

@@ -11,18 +11,16 @@ use std::path::Path;
 pub struct FileReader {
     file_path: String,
     chunk_size: usize,
-    encoding: String,
 }
 
 #[pymethods]
 impl FileReader {
     #[new]
-    #[pyo3(signature = (file_path, chunk_size = 8192, encoding = "utf-8".to_string()))]
-    pub fn new(file_path: String, chunk_size: usize, encoding: String) -> Self {
+    #[pyo3(signature = (file_path, chunk_size = 8192))]
+    pub fn new(file_path: String, chunk_size: usize) -> Self {
         Self {
             file_path,
             chunk_size,
-            encoding,
         }
     }
 

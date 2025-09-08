@@ -20,16 +20,15 @@ __all__ = [
 class FileReader:
     """High-performance file reader with parallel processing capabilities"""
     
-    def __init__(self, file_path: str, chunk_size: int = 8192, encoding: str = "utf-8"):
+    def __init__(self, file_path: str, chunk_size: int = 8192):
         """
         Initialize FileReader
         
         Args:
             file_path: Path to the file to read
             chunk_size: Size of chunks for reading (default: 8192)
-            encoding: Text encoding (default: utf-8)
         """
-        self._reader = _pyferris.FileReader(file_path, chunk_size, encoding)
+        self._reader = _pyferris.FileReader(file_path, chunk_size)
     
     def read_bytes(self) -> bytes:
         """Read entire file as bytes"""
