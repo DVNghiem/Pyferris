@@ -4,14 +4,14 @@ PyFerris - High-performance parallel processing library for Python, powered by R
 
 __version__ = "0.3.1"
 
-from .core import parallel_map, parallel_reduce, parallel_filter, parallel_starmap
-from .config import Config, get_chunk_size, get_worker_count, set_chunk_size, set_worker_count
-from .executor import Executor
-from .io import csv, file_reader, simple_io, file_writer, json, parallel_io
-from .advanced import (
+from .core import (
+    parallel_map, parallel_reduce, parallel_filter, parallel_starmap,
     parallel_sort, parallel_group_by, parallel_unique, parallel_partition,
     parallel_chunks, BatchProcessor, ProgressTracker, ResultCollector
 )
+from .config import Config, get_chunk_size, get_worker_count, set_chunk_size, set_worker_count
+from .executor import Executor
+from .io import csv, file_reader, simple_io, file_writer, json, parallel_io
 
 from .pipeline import Pipeline, Chain, pipeline_map
 from .async_ops import AsyncExecutor, AsyncTask, async_parallel_map, async_parallel_filter

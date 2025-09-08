@@ -15,7 +15,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use pyo3::prelude::*;
 
 // Import modules
-mod advanced;
 mod async_ops;
 mod cache;
 mod concurrent;
@@ -30,7 +29,6 @@ mod scheduler;
 mod shared_memory;
 mod utils;
 
-use advanced::*;
 use async_ops::*;
 use cache::*;
 use concurrent::*;
@@ -74,7 +72,7 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parallel_unique, m)?)?;
     m.add_function(wrap_pyfunction!(parallel_partition, m)?)?;
     m.add_function(wrap_pyfunction!(parallel_chunks, m)?)?;
-    m.add_class::<crate::advanced::BatchProcessor>()?;
+    m.add_class::<crate::core::BatchProcessor>()?;
 
     m.add_class::<Pipeline>()?;
     m.add_class::<Chain>()?;
