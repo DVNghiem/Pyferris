@@ -60,7 +60,6 @@ __all__ = [
     "json",
     "parallel_io",
     
-    # Level 2: Advanced parallel operations
     "parallel_sort",
     "parallel_group_by", 
     "parallel_unique",
@@ -70,18 +69,15 @@ __all__ = [
     "ProgressTracker", 
     "ResultCollector",
     
-    # Level 3: Pipeline Processing
     "Pipeline",
     "Chain", 
     "pipeline_map",
     
-    # Level 3: Async Support
     "AsyncExecutor",
     "AsyncTask",
     "async_parallel_map",
     "async_parallel_filter",
     
-    # Level 3: Shared Memory
     "SharedArray",
     "SharedArrayInt",
     "SharedArrayStr", 
@@ -91,7 +87,6 @@ __all__ = [
     "SharedCounter",
     "create_shared_array",
     
-    # Level 3: Custom Schedulers
     "WorkStealingScheduler",
     "RoundRobinScheduler",
     "AdaptiveScheduler",
@@ -100,25 +95,21 @@ __all__ = [
     "execute_with_priority",
     "create_priority_task",
     
-    # Level 4: Concurrent Data Structures
     "ConcurrentHashMap",
     "LockFreeQueue",
     "AtomicCounter", 
     "RwLockDict",
     
-    # Level 4: Memory Management
     "MemoryPool",
     "memory_mapped_array",
     "memory_mapped_array_2d",
     "memory_mapped_info",
     "create_temp_mmap",
         
-    # Level 4: Smart Cache
     "SmartCache",
     "EvictionPolicy",
     "cached",
     
-    # Level 5: Distributed Processing
     "DistributedCluster",
     "create_cluster",
     "distributed_map", 
