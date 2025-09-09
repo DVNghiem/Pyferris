@@ -1,5 +1,5 @@
 """
-PyFerris Async Operations Tests (Level 3)
+PyFerris Async Operations Tests
 
 Tests for async functionality:
 - AsyncExecutor

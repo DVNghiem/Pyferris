@@ -1,5 +1,5 @@
 """
-Test Level 4 Features - Concurrent Data Structures
+Concurrent Data Structures
 
 This module tests concurrent data structure functionality for thread-safe operations.
 Features tested:

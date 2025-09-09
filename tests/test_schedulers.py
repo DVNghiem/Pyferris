@@ -1,5 +1,5 @@
 """
-PyFerris Schedulers Tests (Level 3)
+PyFerris Schedulers Tests
 
 Tests for custom scheduler functionality:
 - WorkStealingScheduler

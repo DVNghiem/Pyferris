@@ -1,5 +1,5 @@
 """
-Level 4 Features - Concurrent Data Structures
+Concurrent Data Structures
 
 This module provides high-performance, thread-safe data structures for concurrent
 access across multiple threads without blocking operations.

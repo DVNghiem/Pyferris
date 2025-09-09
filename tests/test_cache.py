@@ -1,5 +1,5 @@
 """
-Test Level 4 Features - Smart Cache
+Smart Cache
 
 This module tests cache functionality for the PyFerris framework.
 Features tested:

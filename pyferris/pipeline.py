@@ -1,6 +1,4 @@
 """
-Level 3 Features - Pipeline Processing
-
 This module provides high-level pipeline and chain operations for efficient
 data processing with function composition and parallel execution.
 """

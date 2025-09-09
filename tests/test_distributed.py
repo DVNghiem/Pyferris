@@ -1,6 +1,4 @@
 """
-Test Level 5 Features - Distributed Processing
-
 This module tests distributed processing functionality for enterprise-grade 
 multi-machine cluster management and distributed task execution.
 Features tested:

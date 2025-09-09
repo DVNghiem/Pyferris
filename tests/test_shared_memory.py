@@ -1,5 +1,5 @@
 """
-PyFerris Shared Memory Tests (Level 3)
+PyFerris Shared Memory Tests
 
 Tests for shared memory functionality:
 - SharedArray variants

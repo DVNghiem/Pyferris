@@ -1,5 +1,5 @@
 """
-Test Level 4 Features - Memory Management
+Memory Management
 
 This module tests memory management functionality that works without numpy dependencies.
 """

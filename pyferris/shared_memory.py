@@ -1,6 +1,4 @@
 """
-Level 3 Features - Shared Memory
-
 This module provides thread-safe shared memory data structures for efficient
 zero-copy data sharing between threads and processes.
 """

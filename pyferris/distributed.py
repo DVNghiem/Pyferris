@@ -1,5 +1,5 @@
 """
-PyFerris Level 5: Enterprise Distributed Processing
+PyFerris Enterprise Distributed Processing
 
 This module provides enterprise-grade distributed processing capabilities including:
 - Multi-machine cluster management

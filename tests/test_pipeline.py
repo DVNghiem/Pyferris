@@ -1,5 +1,5 @@
 """
-PyFerris Pipeline Processing Tests (Level 3)
+PyFerris Pipeline Processing Tests
 
 Tests for pipeline functionality:
 - Pipeline class
