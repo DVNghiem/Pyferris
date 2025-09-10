@@ -15,6 +15,7 @@ import json
 import csv
 from pathlib import Path
 
+import pyferris
 from pyferris.io import (
     csv as pyferris_csv,
     json as pyferris_json,
@@ -23,6 +24,7 @@ from pyferris.io import (
     simple_io,
     parallel_io
 )
+
 
 
 class TestCSVOperations:
@@ -106,7 +108,7 @@ class TestCSVOperations:
         nonexistent = os.path.join(test_data_dir, "nonexistent.csv")
         
         try:
-            with pytest.raises((FileNotFoundError, IOError)):
+            with pytest.raises((FileNotFoundError, IOError, pyferris._pyferris.FileReaderError)):
                 pyferris_csv.read_csv(nonexistent)
         except (AttributeError, ImportError):
             pytest.skip("CSV functionality not available")
@@ -190,7 +192,7 @@ class TestJSONOperations:
         Path(empty_json).touch()  # Create empty file
         
         try:
-            with pytest.raises((json.JSONDecodeError, ValueError)):
+            with pytest.raises((json.JSONDecodeError, ValueError, pyferris._pyferris.JsonParsingError)):
                 pyferris_json.read_json(empty_json)
         except (AttributeError, ImportError):
             pytest.skip("JSON functionality not available")
@@ -202,7 +204,7 @@ class TestJSONOperations:
             f.write("{invalid json}")
         
         try:
-            with pytest.raises((json.JSONDecodeError, ValueError)):
+            with pytest.raises((json.JSONDecodeError, ValueError, pyferris._pyferris.JsonParsingError)):
                 pyferris_json.read_json(invalid_json)
         except (AttributeError, ImportError):
             pytest.skip("JSON functionality not available")

@@ -1,4 +1,4 @@
-use crate::error::ParallelExecutionError;
+use crate::error::{FileReaderError, FileWriterError, FolderCreationError};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyString};
 use rayon::prelude::*;
@@ -21,13 +21,13 @@ impl SimpleFileReader {
     /// Read entire file as text
     pub fn read_text(&self) -> PyResult<String> {
         std::fs::read_to_string(&self.file_path)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))
+            .map_err(|e| FileReaderError::new_err(format!("Failed to read file: {}", e)))
     }
 
     /// Read file lines
     pub fn read_lines(&self, py: Python) -> PyResult<Py<PyList>> {
         let content = std::fs::read_to_string(&self.file_path)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| FileReaderError::new_err(format!("Failed to read file: {}", e)))?;
 
         let lines: Vec<&str> = content.lines().collect();
         let py_list = PyList::empty(py);
@@ -56,7 +56,7 @@ impl SimpleFileWriter {
     /// Write text to file
     pub fn write_text(&self, content: &str) -> PyResult<()> {
         std::fs::write(&self.file_path, content)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write file: {}", e)))
+            .map_err(|e| FileWriterError::new_err(format!("Failed to write file: {}", e)))
     }
 
     /// Append text to file
@@ -66,10 +66,10 @@ impl SimpleFileWriter {
             .create(true)
             .append(true)
             .open(&self.file_path)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+            .map_err(|e| FileReaderError::new_err(format!("Failed to open file: {}", e)))?;
 
         file.write_all(content.as_bytes()).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to append to file: {}", e))
+            FileWriterError::new_err(format!("Failed to append to file: {}", e))
         })
     }
 }
@@ -78,14 +78,14 @@ impl SimpleFileWriter {
 #[pyfunction]
 pub fn simple_read_file(file_path: &str) -> PyResult<String> {
     std::fs::read_to_string(file_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))
+        .map_err(|e| FileReaderError::new_err(format!("Failed to read file: {}", e)))
 }
 
 /// Write text content to file
 #[pyfunction]
 pub fn simple_write_file(file_path: &str, content: &str) -> PyResult<()> {
     std::fs::write(file_path, content)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to write file: {}", e)))
 }
 
 /// Read multiple files in parallel
@@ -98,7 +98,7 @@ pub fn simple_parallel_read_files(py: Python, file_paths: Vec<String>) -> PyResu
         })
         .collect();
 
-    let results = results.map_err(|e| ParallelExecutionError::new_err(e))?;
+    let results = results.map_err(|e| FileReaderError::new_err(e))?;
 
     let py_results = PyList::empty(py);
     for result in results {
@@ -118,7 +118,7 @@ pub fn simple_parallel_write_files(file_data: Vec<(String, String)>) -> PyResult
         })
         .collect();
 
-    results.map_err(|e| ParallelExecutionError::new_err(e))?;
+    results.map_err(|e| FileWriterError::new_err(e))?;
     Ok(())
 }
 
@@ -132,7 +132,7 @@ pub fn simple_file_exists(file_path: &str) -> bool {
 #[pyfunction]
 pub fn simple_get_file_size(file_path: &str) -> PyResult<u64> {
     let metadata = std::fs::metadata(file_path).map_err(|e| {
-        ParallelExecutionError::new_err(format!("Failed to get file metadata: {}", e))
+        FileReaderError::new_err(format!("Failed to get file metadata: {}", e))
     })?;
 
     Ok(metadata.len())
@@ -142,21 +142,21 @@ pub fn simple_get_file_size(file_path: &str) -> PyResult<u64> {
 #[pyfunction]
 pub fn simple_create_directory(dir_path: &str) -> PyResult<()> {
     std::fs::create_dir_all(dir_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to create directory: {}", e)))
+        .map_err(|e| FolderCreationError::new_err(format!("Failed to create directory: {}", e)))
 }
 
 /// Delete file
 #[pyfunction]
 pub fn simple_delete_file(file_path: &str) -> PyResult<()> {
     std::fs::remove_file(file_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to delete file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to delete file: {}", e)))
 }
 
 /// Copy file
 #[pyfunction]
 pub fn simple_copy_file(src_path: &str, dst_path: &str) -> PyResult<()> {
     std::fs::copy(src_path, dst_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to copy file: {}", e)))?;
+        .map_err(|e| FileWriterError::new_err(format!("Failed to copy file: {}", e)))?;
     Ok(())
 }
 
@@ -164,5 +164,5 @@ pub fn simple_copy_file(src_path: &str, dst_path: &str) -> PyResult<()> {
 #[pyfunction]
 pub fn simple_move_file(src_path: &str, dst_path: &str) -> PyResult<()> {
     std::fs::rename(src_path, dst_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to move file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to move file: {}", e)))
 }

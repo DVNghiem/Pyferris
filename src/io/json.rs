@@ -1,4 +1,5 @@
-use crate::error::ParallelExecutionError;
+use crate::error::{FileReaderError, FileWriterError, JsonParsingError, ParallelExecutionError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyList};
 use serde_json::{Map, Value};
@@ -26,7 +27,7 @@ impl JsonReader {
 
         let reader = BufReader::new(file);
         let json_value: Value = serde_json::from_reader(reader)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to parse JSON: {}", e)))?;
+            .map_err(|e| JsonParsingError::new_err(format!("Failed to parse JSON: {}", e)))?;
 
         json_value_to_python(py, &json_value)
     }
@@ -34,7 +35,7 @@ impl JsonReader {
     /// Read JSON Lines file (JSONL) as list of objects
     pub fn read_lines(&self, py: Python) -> PyResult<Py<PyList>> {
         let content = std::fs::read_to_string(&self.file_path)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| FileReaderError::new_err(format!("Failed to read file: {}", e)))?;
 
         let py_list = PyList::empty(py);
 
@@ -44,7 +45,7 @@ impl JsonReader {
             }
 
             let json_value: Value = serde_json::from_str(line).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to parse JSON line: {}", e))
+                JsonParsingError::new_err(format!("Failed to parse JSON line: {}", e))
             })?;
 
             let py_obj = json_value_to_python(py, &json_value)?;
@@ -56,13 +57,12 @@ impl JsonReader {
 
     /// Read large JSON file in streaming mode
     pub fn read_array_stream(&self, py: Python) -> PyResult<Py<PyList>> {
-        let file = File::open(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to open JSON file: {}", e))
-        })?;
+        let file = File::open(&self.file_path)
+            .map_err(|e| FileReaderError::new_err(format!("Failed to open JSON file: {}", e)))?;
 
         let reader = BufReader::new(file);
         let json_value: Value = serde_json::from_reader(reader)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to parse JSON: {}", e)))?;
+            .map_err(|e| JsonParsingError::new_err(format!("Failed to parse JSON: {}", e)))?;
 
         match json_value {
             Value::Array(arr) => {
@@ -73,7 +73,7 @@ impl JsonReader {
                 }
                 Ok(py_list.into())
             }
-            _ => Err(ParallelExecutionError::new_err(
+            _ => Err(PyValueError::new_err(
                 "JSON root is not an array".to_string(),
             )),
         }
@@ -102,9 +102,8 @@ impl JsonWriter {
     pub fn write(&self, py: Python, data: Py<PyAny>) -> PyResult<()> {
         let json_value = python_to_json_value(py, &data)?;
 
-        let file = File::create(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to create JSON file: {}", e))
-        })?;
+        let file = File::create(&self.file_path)
+            .map_err(|e| FileWriterError::new_err(format!("Failed to create JSON file: {}", e)))?;
 
         let writer = BufWriter::new(file);
 
@@ -113,34 +112,32 @@ impl JsonWriter {
         } else {
             serde_json::to_writer(writer, &json_value)
         }
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write JSON: {}", e)))?;
+        .map_err(|e| JsonParsingError::new_err(format!("Failed to write JSON: {}", e)))?;
 
         Ok(())
     }
 
     /// Write list of objects as JSON Lines (JSONL)
     pub fn write_lines(&self, py: Python, data: &Bound<'_, PyList>) -> PyResult<()> {
-        let file = File::create(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to create JSONL file: {}", e))
-        })?;
+        let file = File::create(&self.file_path)
+            .map_err(|e| FileWriterError::new_err(format!("Failed to create JSONL file: {}", e)))?;
 
         let mut writer = BufWriter::new(file);
 
         for item in data.iter() {
             let json_value = python_to_json_value(py, &item.into())?;
             let json_string = serde_json::to_string(&json_value).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to serialize JSON: {}", e))
+                JsonParsingError::new_err(format!("Failed to serialize JSON: {}", e))
             })?;
 
-            writeln!(writer, "{}", json_string).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to write line: {}", e))
-            })?;
+            writeln!(writer, "{}", json_string)
+                .map_err(|e| FileWriterError::new_err(format!("Failed to write line: {}", e)))?;
         }
 
         use std::io::Write;
-        writer.flush().map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to flush writer: {}", e))
-        })?;
+        writer
+            .flush()
+            .map_err(|e| FileWriterError::new_err(format!("Failed to flush writer: {}", e)))?;
 
         Ok(())
     }
@@ -154,17 +151,14 @@ impl JsonWriter {
             .create(true)
             .append(true)
             .open(&self.file_path)
-            .map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to open JSONL file: {}", e))
-            })?;
+            .map_err(|e| FileWriterError::new_err(format!("Failed to open JSONL file: {}", e)))?;
 
         let json_value = python_to_json_value(py, &data)?;
-        let json_string = serde_json::to_string(&json_value).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to serialize JSON: {}", e))
-        })?;
+        let json_string = serde_json::to_string(&json_value)
+            .map_err(|e| FileWriterError::new_err(format!("Failed to serialize JSON: {}", e)))?;
 
         writeln!(file, "{}", json_string)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write line: {}", e)))?;
+            .map_err(|e| FileWriterError::new_err(format!("Failed to write line: {}", e)))?;
 
         Ok(())
     }
@@ -220,9 +214,7 @@ fn python_to_json_value(py: Python, obj: &Py<PyAny>) -> PyResult<Value> {
         if let Some(n) = serde_json::Number::from_f64(f) {
             Ok(Value::Number(n))
         } else {
-            Err(ParallelExecutionError::new_err(
-                "Invalid float value".to_string(),
-            ))
+            Err(PyValueError::new_err("Invalid float value".to_string()))
         }
     } else if let Ok(s) = obj.extract::<String>(py) {
         Ok(Value::String(s))
@@ -237,7 +229,7 @@ fn python_to_json_value(py: Python, obj: &Py<PyAny>) -> PyResult<Value> {
         let mut map = Map::new();
         for (key, val) in dict.iter() {
             let key_str: String = key.extract().map_err(|e| {
-                ParallelExecutionError::new_err(format!("Dictionary key must be string: {}", e))
+                PyValueError::new_err(format!("Dictionary key must be string: {}", e))
             })?;
             let json_val = python_to_json_value(py, &val.into())?;
             map.insert(key_str, json_val);
@@ -295,8 +287,7 @@ pub fn append_jsonl(py: Python, file_path: &str, data: Py<PyAny>) -> PyResult<()
 #[pyfunction]
 pub fn parse_json(py: Python, json_str: &str) -> PyResult<Py<PyAny>> {
     let json_value: Value = serde_json::from_str(json_str)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to parse JSON: {}", e)))?;
-
+        .map_err(|e| JsonParsingError::new_err(format!("Failed to parse JSON: {}", e)))?;
     json_value_to_python(py, &json_value)
 }
 
@@ -310,5 +301,5 @@ pub fn to_json_string(py: Python, data: Py<PyAny>, pretty_print: Option<bool>) -
     } else {
         serde_json::to_string(&json_value)
     }
-    .map_err(|e| ParallelExecutionError::new_err(format!("Failed to serialize JSON: {}", e)))
+    .map_err(|e| JsonParsingError::new_err(format!("Failed to serialize JSON: {}", e)))
 }
