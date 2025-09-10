@@ -1,4 +1,5 @@
-use crate::error::ParallelExecutionError;
+use crate::error::{FileReaderError, FileWriterError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::fs::File;
@@ -26,7 +27,7 @@ impl CsvReader {
     /// Read CSV as list of dictionaries
     pub fn read_dict(&self, py: Python) -> PyResult<Py<PyList>> {
         let file = File::open(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to open CSV file: {}", e))
+            FileReaderError::new_err(format!("Failed to open CSV file: {}", e))
         })?;
 
         let mut reader = csv::ReaderBuilder::new()
@@ -38,7 +39,7 @@ impl CsvReader {
             reader
                 .headers()
                 .map_err(|e| {
-                    ParallelExecutionError::new_err(format!("Failed to read headers: {}", e))
+                    FileReaderError::new_err(format!("Failed to read headers: {}", e))
                 })?
                 .iter()
                 .map(|h| h.to_string())
@@ -49,7 +50,7 @@ impl CsvReader {
             match first_record {
                 Some(Ok(record)) => (0..record.len()).map(|i| format!("column_{}", i)).collect(),
                 _ => {
-                    return Err(ParallelExecutionError::new_err(
+                    return Err(FileReaderError::new_err(
                         "Empty CSV file".to_string(),
                     ));
                 }
@@ -59,7 +60,7 @@ impl CsvReader {
         let py_list = PyList::empty(py);
         for result in reader.records() {
             let record = result.map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to read record: {}", e))
+                FileReaderError::new_err(format!("Failed to read record: {}", e))
             })?;
 
             let py_dict = PyDict::new(py);
@@ -75,7 +76,7 @@ impl CsvReader {
     /// Read CSV as list of lists
     pub fn read_rows(&self, py: Python) -> PyResult<Py<PyList>> {
         let file = File::open(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to open CSV file: {}", e))
+            FileReaderError::new_err(format!("Failed to open CSV file: {}", e))
         })?;
 
         let mut reader = csv::ReaderBuilder::new()
@@ -88,7 +89,7 @@ impl CsvReader {
         // Add headers if present
         if self.has_headers {
             let headers = reader.headers().map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to read headers: {}", e))
+                FileReaderError::new_err(format!("Failed to read headers: {}", e))
             })?;
 
             let header_list = PyList::empty(py);
@@ -101,7 +102,7 @@ impl CsvReader {
         // Add data rows
         for result in reader.records() {
             let record = result.map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to read record: {}", e))
+                FileReaderError::new_err(format!("Failed to read record: {}", e))
             })?;
 
             let row_list = PyList::empty(py);
@@ -117,7 +118,7 @@ impl CsvReader {
     /// Get column names/headers
     pub fn get_headers(&self) -> PyResult<Vec<String>> {
         let file = File::open(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to open CSV file: {}", e))
+            FileReaderError::new_err(format!("Failed to open CSV file: {}", e))
         })?;
 
         let mut reader = csv::ReaderBuilder::new()
@@ -127,7 +128,7 @@ impl CsvReader {
 
         if self.has_headers {
             let headers = reader.headers().map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to read headers: {}", e))
+                FileReaderError::new_err(format!("Failed to read headers: {}", e))
             })?;
 
             Ok(headers.iter().map(|h| h.to_string()).collect())
@@ -160,7 +161,7 @@ impl CsvWriter {
     /// Write data from list of dictionaries
     pub fn write_dict(&self, data: &Bound<'_, PyList>) -> PyResult<()> {
         let file = File::create(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to create CSV file: {}", e))
+            FileWriterError::new_err(format!("Failed to create CSV file: {}", e))
         })?;
 
         let mut writer = csv::WriterBuilder::new()
@@ -175,7 +176,7 @@ impl CsvWriter {
         let first_item = data.get_item(0)?;
         let first_dict = first_item
             .downcast::<PyDict>()
-            .map_err(|e| ParallelExecutionError::new_err(format!("Expected dictionary: {}", e)))?;
+            .map_err(|e| PyValueError::new_err(format!("Expected dictionary: {}", e)))?;
 
         let headers: Vec<String> = first_dict
             .keys()
@@ -183,20 +184,20 @@ impl CsvWriter {
             .map(|k| k.extract::<String>())
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to extract headers: {}", e))
+                PyValueError::new_err(format!("Failed to extract headers: {}", e))
             })?;
 
         // Write headers if requested
         if self.write_headers {
             writer.write_record(&headers).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to write headers: {}", e))
+                FileWriterError::new_err(format!("Failed to write headers: {}", e))
             })?;
         }
 
         // Write data rows
         for item in data.iter() {
             let dict = item.downcast::<PyDict>().map_err(|e| {
-                ParallelExecutionError::new_err(format!("Expected dictionary: {}", e))
+                PyValueError::new_err(format!("Expected dictionary: {}", e))
             })?;
 
             let row: Vec<String> = headers
@@ -208,12 +209,12 @@ impl CsvWriter {
                 .collect();
 
             writer.write_record(&row).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to write row: {}", e))
+                FileWriterError::new_err(format!("Failed to write row: {}", e))
             })?;
         }
 
         writer.flush().map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to flush CSV writer: {}", e))
+            FileWriterError::new_err(format!("Failed to flush CSV writer: {}", e))
         })?;
 
         Ok(())
@@ -222,7 +223,7 @@ impl CsvWriter {
     /// Write data from list of lists
     pub fn write_rows(&self, data: &Bound<'_, PyList>) -> PyResult<()> {
         let file = File::create(&self.file_path).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to create CSV file: {}", e))
+            FileWriterError::new_err(format!("Failed to create CSV file: {}", e))
         })?;
 
         let mut writer = csv::WriterBuilder::new()
@@ -232,23 +233,23 @@ impl CsvWriter {
         for item in data.iter() {
             let row = item
                 .downcast::<PyList>()
-                .map_err(|e| ParallelExecutionError::new_err(format!("Expected list: {}", e)))?;
+                .map_err(|e| PyValueError::new_err(format!("Expected list: {}", e)))?;
 
             let row_data: Vec<String> = row
                 .iter()
                 .map(|cell| cell.extract::<String>())
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| {
-                    ParallelExecutionError::new_err(format!("Failed to extract row data: {}", e))
+                    PyValueError::new_err(format!("Failed to extract row data: {}", e))
                 })?;
 
             writer.write_record(&row_data).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to write row: {}", e))
+                FileWriterError::new_err(format!("Failed to write row: {}", e))
             })?;
         }
 
         writer.flush().map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to flush CSV writer: {}", e))
+            FileWriterError::new_err(format!("Failed to flush CSV writer: {}", e))
         })?;
 
         Ok(())

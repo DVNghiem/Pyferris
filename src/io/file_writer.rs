@@ -1,4 +1,4 @@
-use crate::error::ParallelExecutionError;
+use crate::error::{FileReaderError, FileWriterError, FolderCreationError, ParallelExecutionError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList};
 use rayon::prelude::*;
@@ -39,10 +39,10 @@ impl FileWriter {
                 .truncate(true)
                 .open(&self.file_path)
         }
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| FileReaderError::new_err(format!("Failed to open file: {}", e)))?;
 
         file.write_all(content.as_bytes()).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to write to file: {}", e))
+            FileWriterError::new_err(format!("Failed to write to file: {}", e))
         })?;
 
         Ok(())
@@ -62,10 +62,10 @@ impl FileWriter {
                 .truncate(true)
                 .open(&self.file_path)
         }
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| FileWriterError::new_err(format!("Failed to open file: {}", e)))?;
 
         file.write_all(content.as_bytes()).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to write to file: {}", e))
+            FileWriterError::new_err(format!("Failed to write to file: {}", e))
         })?;
 
         Ok(())
@@ -85,22 +85,22 @@ impl FileWriter {
                 .truncate(true)
                 .open(&self.file_path)
         }
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| FileReaderError::new_err(format!("Failed to open file: {}", e)))?;
 
         let mut writer = BufWriter::with_capacity(self.buffer_size, file);
 
         for item in lines.iter() {
             let line: String = item.extract().map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to extract line: {}", e))
+                FileReaderError::new_err(format!("Failed to extract line: {}", e))
             })?;
 
             writeln!(writer, "{}", line).map_err(|e| {
-                ParallelExecutionError::new_err(format!("Failed to write line: {}", e))
+                FileWriterError::new_err(format!("Failed to write line: {}", e))
             })?;
         }
 
         writer.flush().map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to flush buffer: {}", e))
+            FileWriterError::new_err(format!("Failed to flush buffer: {}", e))
         })?;
 
         Ok(())
@@ -112,10 +112,10 @@ impl FileWriter {
             .create(true)
             .append(true)
             .open(&self.file_path)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+            .map_err(|e| FileReaderError::new_err(format!("Failed to open file: {}", e)))?;
 
         file.write_all(content.as_bytes()).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to append to file: {}", e))
+            FileWriterError::new_err(format!("Failed to append to file: {}", e))
         })?;
 
         Ok(())
@@ -127,10 +127,10 @@ impl FileWriter {
             .create(true)
             .append(true)
             .open(&self.file_path)
-            .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+            .map_err(|e| FileReaderError::new_err(format!("Failed to open file: {}", e)))?;
 
         writeln!(file, "{}", line).map_err(|e| {
-            ParallelExecutionError::new_err(format!("Failed to append line: {}", e))
+            FileWriterError::new_err(format!("Failed to append line: {}", e))
         })?;
 
         Ok(())
@@ -141,14 +141,14 @@ impl FileWriter {
 #[pyfunction]
 pub fn write_file_text(file_path: &str, content: &str) -> PyResult<()> {
     std::fs::write(file_path, content)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to write file: {}", e)))
 }
 
 /// Write bytes content to file
 #[pyfunction]
 pub fn write_file_bytes(file_path: &str, content: &Bound<'_, PyBytes>) -> PyResult<()> {
     std::fs::write(file_path, content.as_bytes())
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to write file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to write file: {}", e)))
 }
 
 /// Append text to file
@@ -158,10 +158,10 @@ pub fn append_file_text(file_path: &str, content: &str) -> PyResult<()> {
         .create(true)
         .append(true)
         .open(file_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to open file: {}", e)))?;
+        .map_err(|e| FileReaderError::new_err(format!("Failed to open file: {}", e)))?;
 
     file.write_all(content.as_bytes())
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to append to file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to append to file: {}", e)))
 }
 
 /// Write multiple files in parallel
@@ -182,21 +182,21 @@ pub fn parallel_write_files(file_data: Vec<(String, String)>) -> PyResult<()> {
 #[pyfunction]
 pub fn create_directory(dir_path: &str) -> PyResult<()> {
     std::fs::create_dir_all(dir_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to create directory: {}", e)))
+        .map_err(|e| FolderCreationError::new_err(format!("Failed to create directory: {}", e)))
 }
 
 /// Delete file
 #[pyfunction]
 pub fn delete_file(file_path: &str) -> PyResult<()> {
     std::fs::remove_file(file_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to delete file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to delete file: {}", e)))
 }
 
 /// Copy file
 #[pyfunction]
 pub fn copy_file(src_path: &str, dst_path: &str) -> PyResult<()> {
     std::fs::copy(src_path, dst_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to copy file: {}", e)))?;
+        .map_err(|e| FileWriterError::new_err(format!("Failed to copy file: {}", e)))?;
     Ok(())
 }
 
@@ -204,5 +204,5 @@ pub fn copy_file(src_path: &str, dst_path: &str) -> PyResult<()> {
 #[pyfunction]
 pub fn move_file(src_path: &str, dst_path: &str) -> PyResult<()> {
     std::fs::rename(src_path, dst_path)
-        .map_err(|e| ParallelExecutionError::new_err(format!("Failed to move file: {}", e)))
+        .map_err(|e| FileWriterError::new_err(format!("Failed to move file: {}", e)))
 }

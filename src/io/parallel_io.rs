@@ -1,4 +1,4 @@
-use crate::error::ParallelExecutionError;
+use crate::error::{FileReaderError, FileWriterError, ParallelExecutionError};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use rayon::prelude::*;
@@ -93,7 +93,7 @@ impl ParallelFileProcessor {
             })
             .collect();
 
-        let results = results.map_err(|e| ParallelExecutionError::new_err(e))?;
+        let results = results.map_err(|e| FileReaderError::new_err(e))?;
 
         let py_results = PyList::empty(py);
         for (path, content) in file_paths.iter().zip(results.iter()) {
@@ -114,7 +114,7 @@ impl ParallelFileProcessor {
             })
             .collect();
 
-        results.map_err(|e| ParallelExecutionError::new_err(e))?;
+        results.map_err(|e| FileWriterError::new_err(e))?;
         Ok(())
     }
 
