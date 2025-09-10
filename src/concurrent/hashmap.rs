@@ -1,12 +1,24 @@
 use dashmap::DashMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::hash::Hash;
 use std::sync::Arc;
 
-/// A thread-safe, lock-free hash map implementation using DashMap
+/// A hashable key wrapper for Python objects
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct PyKey(u64);
+
+impl PyKey {
+    pub fn new(_py: Python, obj: &Bound<PyAny>) -> PyResult<Self> {
+        let hash = obj.hash()?;
+        Ok(PyKey(hash as u64))
+    }
+}
+
+/// A thread-safe, lock-free hash map implementation using DashMap with dynamic key types
 #[pyclass]
 pub struct ConcurrentHashMap {
-    inner: Arc<DashMap<String, Py<PyAny>>>,
+    inner: Arc<DashMap<PyKey, (Py<PyAny>, Py<PyAny>)>>, // (key_obj, value)
 }
 
 #[pymethods]
@@ -19,23 +31,28 @@ impl ConcurrentHashMap {
     }
 
     /// Insert a key-value pair into the map
-    pub fn insert(&self, key: String, value: Py<PyAny>) -> PyResult<Option<Py<PyAny>>> {
-        Ok(self.inner.insert(key, value))
+    pub fn insert(&self, py: Python, key: Bound<PyAny>, value: Py<PyAny>) -> PyResult<Option<Py<PyAny>>> {
+        let py_key = PyKey::new(py, &key)?;
+        let key_obj = key.unbind();
+        Ok(self.inner.insert(py_key, (key_obj, value)).map(|(_, v)| v))
     }
 
     /// Get a value by key
-    pub fn get(&self, py: Python, key: &str) -> PyResult<Option<Py<PyAny>>> {
-        Ok(self.inner.get(key).map(|entry| entry.value().clone_ref(py)))
+    pub fn get(&self, py: Python, key: Bound<PyAny>) -> PyResult<Option<Py<PyAny>>> {
+        let py_key = PyKey::new(py, &key)?;
+        Ok(self.inner.get(&py_key).map(|entry| entry.value().1.clone_ref(py)))
     }
 
     /// Remove a key-value pair
-    pub fn remove(&self, key: &str) -> PyResult<Option<Py<PyAny>>> {
-        Ok(self.inner.remove(key).map(|(_, value)| value))
+    pub fn remove(&self, py: Python, key: Bound<PyAny>) -> PyResult<Option<Py<PyAny>>> {
+        let py_key = PyKey::new(py, &key)?;
+        Ok(self.inner.remove(&py_key).map(|(_, (_, value))| value))
     }
 
     /// Check if a key exists
-    pub fn contains_key(&self, key: &str) -> bool {
-        self.inner.contains_key(key)
+    pub fn contains_key(&self, py: Python, key: Bound<PyAny>) -> PyResult<bool> {
+        let py_key = PyKey::new(py, &key)?;
+        Ok(self.inner.contains_key(&py_key))
     }
 
     /// Get the number of entries
@@ -54,8 +71,8 @@ impl ConcurrentHashMap {
     }
 
     /// Get all keys
-    pub fn keys(&self) -> PyResult<Vec<String>> {
-        Ok(self.inner.iter().map(|entry| entry.key().clone()).collect())
+    pub fn keys(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
+        Ok(self.inner.iter().map(|entry| entry.value().0.clone_ref(py)).collect())
     }
 
     /// Get all values
@@ -63,40 +80,45 @@ impl ConcurrentHashMap {
         Ok(self
             .inner
             .iter()
-            .map(|entry| entry.value().clone_ref(py))
+            .map(|entry| entry.value().1.clone_ref(py))
             .collect())
     }
 
     /// Get all key-value pairs as tuples
-    pub fn items(&self, py: Python) -> PyResult<Vec<(String, Py<PyAny>)>> {
+    pub fn items(&self, py: Python) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
         Ok(self
             .inner
             .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone_ref(py)))
+            .map(|entry| (entry.value().0.clone_ref(py), entry.value().1.clone_ref(py)))
             .collect())
     }
 
     /// Update with another dictionary
-    pub fn update(&self, other: &Bound<PyDict>) -> PyResult<()> {
+    pub fn update(&self, py: Python, other: &Bound<PyDict>) -> PyResult<()> {
         for (key, value) in other.iter() {
-            let key_str: String = key.extract()?;
-            self.inner.insert(key_str, value.unbind());
+            let py_key = PyKey::new(py, &key)?;
+            let key_obj = key.unbind();
+            self.inner.insert(py_key, (key_obj, value.unbind()));
         }
         Ok(())
     }
 
     /// Get with default value
-    pub fn get_or_default(&self, py: Python, key: &str, default: Py<PyAny>) -> PyResult<Py<PyAny>> {
+    pub fn get_or_default(&self, py: Python, key: Bound<PyAny>, default: Py<PyAny>) -> PyResult<Py<PyAny>> {
+        let py_key = PyKey::new(py, &key)?;
         Ok(self
             .inner
-            .get(key)
-            .map(|entry| entry.value().clone_ref(py))
+            .get(&py_key)
+            .map(|entry| entry.value().1.clone_ref(py))
             .unwrap_or(default))
     }
 
     /// Atomic get-or-insert operation
-    pub fn get_or_insert(&self, py: Python, key: String, value: Py<PyAny>) -> PyResult<Py<PyAny>> {
-        Ok(self.inner.entry(key).or_insert(value).clone_ref(py))
+    pub fn get_or_insert(&self, py: Python, key: Bound<PyAny>, value: Py<PyAny>) -> PyResult<Py<PyAny>> {
+        let py_key = PyKey::new(py, &key)?;
+        let key_obj = key.unbind();
+        let entry = self.inner.entry(py_key).or_insert((key_obj, value.clone_ref(py)));
+        Ok(entry.1.clone_ref(py))
     }
 
     /// Get shard count (for debugging/optimization)
@@ -116,24 +138,24 @@ impl ConcurrentHashMap {
         self.len()
     }
 
-    fn __contains__(&self, key: &str) -> bool {
-        self.contains_key(key)
+    fn __contains__(&self, py: Python, key: Bound<PyAny>) -> PyResult<bool> {
+        self.contains_key(py, key)
     }
 
-    fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
-        self.get(py, key)?.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key))
+    fn __getitem__(&self, py: Python, key: Bound<PyAny>) -> PyResult<Py<PyAny>> {
+        self.get(py, key.clone())?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key not found"))
         })
     }
 
-    fn __setitem__(&self, key: String, value: Py<PyAny>) -> PyResult<()> {
-        self.insert(key, value)?;
+    fn __setitem__(&self, py: Python, key: Bound<PyAny>, value: Py<PyAny>) -> PyResult<()> {
+        self.insert(py, key, value)?;
         Ok(())
     }
 
-    fn __delitem__(&self, key: &str) -> PyResult<()> {
-        self.remove(key)?.ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key '{}' not found", key))
+    fn __delitem__(&self, py: Python, key: Bound<PyAny>) -> PyResult<()> {
+        self.remove(py, key)?.ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Key not found"))
         })?;
         Ok(())
     }
