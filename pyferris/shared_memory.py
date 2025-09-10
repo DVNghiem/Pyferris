@@ -11,8 +11,7 @@ from ._pyferris import (
     SharedArrayObj as _SharedArrayObj,
     SharedDict as _SharedDict, 
     SharedQueue as _SharedQueue, 
-    SharedCounter as _SharedCounter, 
-    create_shared_array as _create_shared_array
+    SharedCounter as _SharedCounter
 )
 
 
