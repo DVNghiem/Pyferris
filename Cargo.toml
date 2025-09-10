@@ -1,6 +1,6 @@
 [package]
 name = "Pyferris"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 description = "PyFerris is a high-performance parallel processing library for Python, powered by Rust and PyO3"
 authors = ["Dang Van Nghiem <martin@smartsolution.id.vn>"]
