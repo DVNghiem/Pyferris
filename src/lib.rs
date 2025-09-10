@@ -127,5 +127,9 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         py.get_type::<ParallelExecutionError>(),
     )?;
 
+    m.add("FileReaderError", py.get_type::<FileReaderError>())?;
+    m.add("FileWriterError", py.get_type::<FileWriterError>())?;
+    m.add("FolderCreationError", py.get_type::<FolderCreationError>())?;
+
     Ok(())
 }
