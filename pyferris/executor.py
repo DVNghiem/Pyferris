@@ -19,23 +19,7 @@ def _get_pool_lock():
         _POOL_LOCK = threading.Lock()
     return _POOL_LOCK
 
-class Future:
-    """A simple future-like object for compatibility with optimized memory usage."""
-    
-    __slots__ = ('_result', '_done')  # Memory optimization
-    
-    def __init__(self, result):
-        self._result = result
-        self._done = True
-    
-    def result(self, timeout=None):
-        """Get the result of the computation."""
-        del timeout  # Unused parameter
-        return self._result
-    
-    def done(self):
-        """Return True if the computation is done."""
-        return self._done
+
 
 class Executor(concurrent.futures.Executor):
     """High-performance parallel task executor with memory optimizations."""

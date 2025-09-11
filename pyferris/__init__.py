@@ -28,6 +28,12 @@ from .concurrent import ConcurrentHashMap, LockFreeQueue, AtomicCounter, RwLockD
 from .memory import MemoryPool, memory_mapped_array, memory_mapped_array_2d, memory_mapped_info, create_temp_mmap
 from .cache import SmartCache, EvictionPolicy, cached
 
+# Safe threading - Rust-backed thread safety
+from .safe_thread import (
+    SafeThread, SafeThreadPool, SafeLock, SafeCondition, SafeThreadError,
+    safe_thread_decorator, run_in_safe_thread, safe_parallel_map, create_safe_shared_data
+)
+
 from .distributed import (
     DistributedCluster, create_cluster, distributed_map, distributed_filter,
     async_distributed_map, ClusterManager, LoadBalancer, DistributedExecutor,
@@ -121,5 +127,16 @@ __all__ = [
     "DistributedBatchProcessor",
     "cluster_map",
     "distributed_reduce",
+    
+    # Safe threading
+    "SafeThread",
+    "SafeThreadPool", 
+    "SafeLock",
+    "SafeCondition",
+    "SafeThreadError",
+    "safe_thread_decorator",
+    "run_in_safe_thread",
+    "safe_parallel_map",
+    "create_safe_shared_data",
 
 ]
