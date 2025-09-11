@@ -28,6 +28,7 @@ mod pipeline;
 mod scheduler;
 mod shared_memory;
 mod utils;
+mod virtual_thread;
 
 use async_ops::*;
 use cache::*;
@@ -42,6 +43,7 @@ use pipeline::*;
 use scheduler::*;
 use shared_memory::*;
 use utils::*;
+use virtual_thread::*;
 
 /// Pyferris Rust Extensions
 /// High-performance Rust implementations
@@ -120,6 +122,12 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DistributedBatchProcessor>()?;
     m.add_function(wrap_pyfunction!(cluster_map, m)?)?;
     m.add_function(wrap_pyfunction!(distributed_reduce, m)?)?;
+
+    // Register virtual thread functionality
+    m.add_class::<VirtualThreadExecutor>()?;
+    m.add_function(wrap_pyfunction!(create_virtual_thread_executor, m)?)?;
+    m.add_function(wrap_pyfunction!(execute_in_virtual_thread, m)?)?;
+    m.add_function(wrap_pyfunction!(virtual_thread_map, m)?)?;
 
     // Register custom exception
     m.add(

@@ -34,6 +34,13 @@ from .distributed import (
     DistributedBatchProcessor, cluster_map, distributed_reduce
 )
 
+from .virtual_thread import (
+    VirtualThreadExecutor, VirtualThreadPool, VirtualThreadFuture,
+    AsyncVirtualThreadPool, create_virtual_thread_executor,
+    execute_in_virtual_thread, virtual_thread_map, run_in_virtual_thread,
+    virtual_map, virtual_thread_benchmark
+)
+
 __all__ = [
     # core base functionality
     "__version__",
@@ -121,5 +128,17 @@ __all__ = [
     "DistributedBatchProcessor",
     "cluster_map",
     "distributed_reduce",
+
+    # Virtual Threads
+    "VirtualThreadExecutor",
+    "VirtualThreadPool",
+    "VirtualThreadFuture",
+    "AsyncVirtualThreadPool",
+    "create_virtual_thread_executor",
+    "execute_in_virtual_thread",
+    "virtual_thread_map",
+    "run_in_virtual_thread",
+    "virtual_map",
+    "virtual_thread_benchmark",
 
 ]
