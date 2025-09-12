@@ -364,7 +364,7 @@ def run_in_virtual_thread(
     Args:
         func: Function to execute
         *args: Positional arguments
-        priority: Task priority (0-255)
+        priority: Task priority (0-255) TODO: Currently unused in this function
         is_blocking: Whether the function may block
         **kwargs: Keyword arguments
         
@@ -377,7 +377,7 @@ def run_in_virtual_thread(
         wrapped_func = func
     
     return execute_in_virtual_thread(
-        wrapped_func, args if args else None, priority, is_blocking
+        wrapped_func, args if args else None, is_blocking
     )
 
 

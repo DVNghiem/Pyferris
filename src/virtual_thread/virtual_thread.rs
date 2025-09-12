@@ -240,7 +240,6 @@ impl VirtualThreadExecutor {
                 .name(format!("virtual-thread-carrier-{}", i))
                 .spawn(move || {
                     Self::platform_thread_loop(
-                        i,
                         work_queue,
                         stealers,
                         is_running,
@@ -257,7 +256,6 @@ impl VirtualThreadExecutor {
     }
 
     fn platform_thread_loop(
-        _thread_id: usize,
         work_queue: Arc<Injector<VirtualThread>>,
         stealers: Arc<Mutex<Vec<Stealer<VirtualThread>>>>,
         is_running: Arc<AtomicBool>,
@@ -266,7 +264,6 @@ impl VirtualThreadExecutor {
         completed_threads: Arc<AtomicU64>,
         runtime: Arc<Mutex<Option<tokio::runtime::Runtime>>>,
     ) {
-        let _local_worker: Worker<VirtualThread> = Worker::new_fifo();
         
         while is_running.load(Ordering::Relaxed) {
             // Try to get work from global queue first
@@ -321,15 +318,15 @@ impl VirtualThreadExecutor {
             // Handle blocking operations asynchronously
             if let Some(runtime) = runtime.lock().unwrap().as_ref() {
                 runtime.spawn(async move {
-                    let _result = vthread.execute();
+                    let _ = vthread.execute();
                 });
             } else {
                 // Fallback to direct execution
-                let _result = vthread.execute();
+                let _ = vthread.execute();
             }
         } else {
             // Direct execution for non-blocking tasks
-            let _result = vthread.execute();
+            let _ = vthread.execute();
         }
         
         active_threads.fetch_sub(1, Ordering::Relaxed);
@@ -547,11 +544,16 @@ pub fn execute_in_virtual_thread(
 ) -> PyResult<Py<PyAny>> {
     let executor = VirtualThreadExecutor::new(None, None)?;
     executor.start()?;
+
+    println!("Submitting virtual task...");
     
     let thread_id = executor.submit_virtual_task(func, args, is_blocking)?;
+    println!("Submitted virtual task with ID: {}", thread_id);
     let result = executor.join(thread_id)?;
+    println!("Virtual task with ID {} completed.", thread_id);
     
     executor.shutdown()?;
+    println!("Executor shutdown.");
     Ok(result)
 }
 
