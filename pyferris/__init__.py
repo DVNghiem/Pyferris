@@ -40,6 +40,13 @@ from .distributed import (
     DistributedBatchProcessor, cluster_map, distributed_reduce
 )
 
+from .virtual_thread import (
+    VirtualThreadExecutor, VirtualThreadPool, VirtualThreadFuture,
+    AsyncVirtualThreadPool, create_virtual_thread_executor,
+    execute_in_virtual_thread, virtual_thread_map, run_in_virtual_thread,
+    virtual_map, virtual_thread_benchmark
+)
+
 __all__ = [
     # core base functionality
     "__version__",
@@ -138,5 +145,17 @@ __all__ = [
     "run_in_safe_thread",
     "safe_parallel_map",
     "create_safe_shared_data",
+
+    # Virtual Threads
+    "VirtualThreadExecutor",
+    "VirtualThreadPool",
+    "VirtualThreadFuture",
+    "AsyncVirtualThreadPool",
+    "create_virtual_thread_executor",
+    "execute_in_virtual_thread",
+    "virtual_thread_map",
+    "run_in_virtual_thread",
+    "virtual_map",
+    "virtual_thread_benchmark",
 
 ]
