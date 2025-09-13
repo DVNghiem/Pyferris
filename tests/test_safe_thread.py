@@ -239,3 +239,53 @@ def test_integration_workflow():
 
     # Check final result
     assert shared_counter.get() == 30  # 3 workers * 10 increments each
+
+
+def test_non_blocking_behavior():
+    """Test that SafeThread and SafeThreadPool don't block when starting tasks."""
+    import time
+    
+    def long_task(duration):
+        time.sleep(duration)
+        return f"completed after {duration}s"
+    
+    # Test SafeThread non-blocking behavior
+    start_time = time.time()
+    threads = []
+    
+    for i in range(3):
+        thread = SafeThread(target=long_task, args=(1,))
+        threads.append(thread)
+        thread.start()  # This should not block
+    
+    # All threads should start within a short time
+    start_duration = time.time() - start_time
+    assert start_duration < 0.5, f"Starting threads took too long: {start_duration}s"
+    
+    # Wait for completion
+    for thread in threads:
+        result = thread.get_result(timeout=2)
+        assert result == "completed after 1s"
+    
+    total_duration = time.time() - start_time
+    assert total_duration < 1.5, f"Parallel execution took too long: {total_duration}s"
+    
+    # Test SafeThreadPool non-blocking behavior
+    start_time = time.time()
+    
+    with SafeThreadPool(max_workers=3) as pool:
+        futures = []
+        for i in range(3):
+            future = pool.submit(long_task, 1)
+            futures.append(future)
+        
+        # Submitting should be fast
+        submit_duration = time.time() - start_time
+        assert submit_duration < 0.5, f"Submitting tasks took too long: {submit_duration}s"
+        
+        # Wait for results
+        results = [future.result(timeout=2) for future in futures]
+        assert all(result == "completed after 1s" for result in results)
+    
+    total_duration = time.time() - start_time
+    assert total_duration < 1.5, f"Pool execution took too long: {total_duration}s"
