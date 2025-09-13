@@ -5,7 +5,6 @@ that leverages Rust's safety guarantees and performance optimizations.
 
 import threading
 import queue
-import concurrent.futures
 from functools import wraps
 from ._pyferris import Executor as _RustExecutor
 from .concurrent import AtomicCounter, LockFreeQueue
