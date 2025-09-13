@@ -4,6 +4,7 @@ that leverages Rust's safety guarantees and performance optimizations.
 """
 
 import threading
+import queue
 from functools import wraps
 from ._pyferris import Executor as _RustExecutor
 from .concurrent import AtomicCounter, LockFreeQueue
@@ -62,12 +63,13 @@ class SafeThread:
         self._kwargs = kwargs or {}
         self._daemon = daemon
         self._executor = None
-        self._future = None
+        self._thread = None
         self._started = False
         self._finished = False
         self._exception = None
         self._result = None
         self._lock = threading.Lock()
+        self._result_ready = threading.Event()
         
     @property
     def name(self):
@@ -102,28 +104,35 @@ class SafeThread:
                 raise RuntimeError("Thread already started")
             
             self._started = True
-            # Use a single-threaded executor for this specific task
-            self._executor = _RustExecutor(1)
             
-            # Wrap the target function to handle exceptions properly
-            def safe_wrapper():
+            # Create a Python thread that will use the Rust executor for the actual work
+            def thread_worker():
                 try:
-                    if self._target:
-                        return self._target(*self._args, **self._kwargs)
-                    else:
-                        return self.run()
+                    # Create a single-threaded Rust executor for this task
+                    executor = _RustExecutor(1)
+                    
+                    def safe_wrapper():
+                        if self._target:
+                            return self._target(*self._args, **self._kwargs)
+                        else:
+                            return self.run()
+                    
+                    # Execute the task using the Rust executor
+                    self._result = executor.submit(safe_wrapper)
+                    
                 except Exception as e:
                     self._exception = e
-                    return None
+                finally:
+                    self._finished = True
+                    self._result_ready.set()
             
-            # Submit the task to the Rust executor
-            # The Rust executor returns the result directly, not a Future
-            try:
-                self._result = self._executor.submit(safe_wrapper)
-                self._finished = True
-            except Exception as e:
-                self._exception = e
-                self._finished = True
+            # Create and start the Python thread
+            self._thread = threading.Thread(
+                target=thread_worker,
+                name=self._name,
+                daemon=self._daemon
+            )
+            self._thread.start()
     
     def run(self):
         """
@@ -150,7 +159,10 @@ class SafeThread:
         if not self._started:
             raise RuntimeError("Cannot join thread before it is started")
         
-        # Since the Rust executor executes immediately, the thread is already finished
+        if self._thread:
+            self._thread.join(timeout)
+            return not self._thread.is_alive()
+        
         return self._finished
     
     def is_alive(self):
@@ -163,12 +175,17 @@ class SafeThread:
         if not self._started:
             return False
         
-        # Since the Rust executor executes immediately, check if finished
+        if self._thread:
+            return self._thread.is_alive()
+        
         return not self._finished
     
-    def get_result(self):
+    def get_result(self, timeout=None):
         """
         Get the result of the thread's execution.
+        
+        Args:
+            timeout: Maximum time to wait for the result
         
         Returns:
             The return value of the target function
@@ -176,8 +193,12 @@ class SafeThread:
         Raises:
             SafeThreadError: If the thread hasn't finished or had an exception
         """
-        if not self._finished:
-            raise SafeThreadError("Thread has not finished yet")
+        if not self._started:
+            raise SafeThreadError("Thread has not been started")
+        
+        # Wait for the result to be ready
+        if not self._result_ready.wait(timeout):
+            raise SafeThreadError("Timeout waiting for thread result")
         
         if self._exception:
             raise SafeThreadError(f"Thread raised an exception: {self._exception}")
@@ -192,6 +213,42 @@ class SafeThread:
             The exception that occurred, or None if no exception
         """
         return self._exception
+
+
+class AsyncResult:
+    """A future-like object that handles asynchronous results from SafeThreadPool."""
+    
+    def __init__(self):
+        self._result = None
+        self._exception = None
+        self._done = False
+        self._result_ready = threading.Event()
+    
+    def set_result(self, result):
+        """Set the result of the computation."""
+        self._result = result
+        self._done = True
+        self._result_ready.set()
+    
+    def set_exception(self, exception):
+        """Set an exception for the computation."""
+        self._exception = exception
+        self._done = True
+        self._result_ready.set()
+    
+    def result(self, timeout=None):
+        """Get the result of the computation."""
+        if not self._result_ready.wait(timeout):
+            raise TimeoutError("Timeout waiting for result")
+        
+        if self._exception:
+            raise self._exception
+        
+        return self._result
+    
+    def done(self):
+        """Return True if the computation is done."""
+        return self._done
 
 
 class SafeThreadPool:
@@ -210,9 +267,59 @@ class SafeThreadPool:
         """
         self.max_workers = max_workers or min(32, (threading.cpu_count() or 1) + 4)
         self.thread_name_prefix = thread_name_prefix
-        self._executor = _RustExecutor(self.max_workers)
         self._shutdown = False
         self._task_counter = AtomicCounter(0)
+        self._work_queue = queue.Queue()
+        self._workers = []
+        self._lock = threading.Lock()
+        
+        # Start worker threads
+        self._start_workers()
+    
+    def _start_workers(self):
+        """Start the worker threads."""
+        for i in range(self.max_workers):
+            worker = threading.Thread(
+                target=self._worker,
+                name=f"{self.thread_name_prefix}-{i}",
+                daemon=True
+            )
+            worker.start()
+            self._workers.append(worker)
+    
+    def _worker(self):
+        """Worker thread that processes tasks from the queue."""
+        # Each worker gets its own Rust executor with 1 thread for safety
+        executor = _RustExecutor(1)
+        
+        while not self._shutdown:
+            try:
+                task_data = self._work_queue.get(timeout=0.1)
+                if task_data is None:  # Shutdown signal
+                    self._work_queue.task_done()
+                    break
+                
+                func, args, kwargs, result_future = task_data
+                
+                try:
+                    # Use the Rust executor to run the task safely
+                    def wrapper():
+                        return func(*args, **kwargs)
+                    
+                    result = executor.submit(wrapper)
+                    result_future.set_result(result)
+                
+                except Exception as e:
+                    result_future.set_exception(e)
+                finally:
+                    self._task_counter.decrement()
+                    self._work_queue.task_done()
+                    
+            except queue.Empty:
+                continue
+            except Exception as e:
+                # Log error but continue working
+                print(f"Worker error: {e}")
     
     def submit(self, func, *args, **kwargs):
         """
@@ -231,18 +338,14 @@ class SafeThreadPool:
         
         self._task_counter.increment()
         
-        # Create a wrapper function that handles the arguments
-        def wrapper():
-            try:
-                return func(*args, **kwargs)
-            finally:
-                self._task_counter.decrement()
+        # Create a future to hold the result
+        result_future = AsyncResult()
         
-        # The Rust executor returns the result directly, so we need to wrap it
-        result = self._executor.submit(wrapper)
+        # Add the task to the work queue
+        task_data = (func, args, kwargs, result_future)
+        self._work_queue.put(task_data)
         
-        # Create a simple future-like object
-        return Future(result)
+        return result_future
     
     def map(self, func, iterable, timeout=None, chunksize=1):
         """
@@ -260,11 +363,25 @@ class SafeThreadPool:
         if self._shutdown:
             raise RuntimeError("Cannot schedule new futures after shutdown")
         
-        # Set chunk size on the executor
-        self._executor.set_chunk_size(chunksize)
+        # Convert iterable to list for better handling
+        items = list(iterable)
         
-        # Use the executor's optimized map function
-        return self._executor.map(func, iterable)
+        if not items:
+            return []
+        
+        # Submit all tasks
+        futures = []
+        for item in items:
+            future = self.submit(func, item)
+            futures.append(future)
+        
+        # Collect results
+        results = []
+        for future in futures:
+            result = future.result(timeout)
+            results.append(result)
+        
+        return results
     
     def shutdown(self, wait=True):
         """
@@ -273,8 +390,23 @@ class SafeThreadPool:
         Args:
             wait: Whether to wait for pending tasks
         """
-        self._shutdown = True
-        self._executor.shutdown()  # The Rust executor doesn't take arguments
+        with self._lock:
+            if self._shutdown:
+                return
+            
+            self._shutdown = True
+            
+            # Signal all workers to stop
+            for _ in self._workers:
+                self._work_queue.put(None)
+            
+            if wait:
+                # Wait for workers to finish
+                for worker in self._workers:
+                    worker.join()
+                
+                # Wait for queue to be empty
+                self._work_queue.join()
     
     def __enter__(self):
         return self
