@@ -2,10 +2,11 @@
 PyFerris Async Operations Tests
 
 Tests for async functionality:
-- AsyncExecutor
+- AsyncExecutor (optimized for loop.run_in_executor)
 - AsyncTask
 - async_parallel_map
 - async_parallel_filter
+- run_in_executor_optimized
 """
 
 import pytest
@@ -13,7 +14,7 @@ import asyncio
 import time
 
 from pyferris.async_ops import (
-    AsyncExecutor, async_parallel_map, async_parallel_filter
+    AsyncExecutor, async_parallel_map, async_parallel_filter, run_in_executor_optimized
 )
 
 
@@ -91,6 +92,65 @@ class TestAsyncExecutor:
         executor = AsyncExecutor(max_workers=2)
         result = executor.map_async(task, [5])
         assert result == [25]
+
+    def test_async_executor_as_executor_interface(self):
+        """Test AsyncExecutor as an Executor for loop.run_in_executor."""
+        async def test_executor():
+            def simple_task(x):
+                return x * 3
+            
+            executor = AsyncExecutor(max_workers=2)
+            try:
+                loop = asyncio.get_event_loop()
+                
+                # Submit single task
+                result = await loop.run_in_executor(executor, simple_task, 5)
+                assert result == 15
+                
+                # Submit multiple tasks
+                tasks = [
+                    loop.run_in_executor(executor, simple_task, i)
+                    for i in range(5)
+                ]
+                results = await asyncio.gather(*tasks)
+                expected = [i * 3 for i in range(5)]
+                assert results == expected
+            finally:
+                executor.shutdown()
+        
+        # Run the async test
+        asyncio.run(test_executor())
+
+    def test_async_executor_submit_method(self):
+        """Test AsyncExecutor submit method."""
+        def task_with_args(x, y):
+            return x + y
+        
+        executor = AsyncExecutor(max_workers=2)
+        try:
+            future = executor.submit(task_with_args, 3, 4)
+            result = future.result(timeout=5.0)
+            assert result == 7
+        finally:
+            executor.shutdown()
+
+    def test_async_executor_shutdown(self):
+        """Test AsyncExecutor shutdown behavior."""
+        executor = AsyncExecutor(max_workers=2)
+        
+        # Should work before shutdown
+        future = executor.submit(lambda x: x * 2, 5)
+        result = future.result(timeout=5.0)
+        assert result == 10
+        
+        # Shutdown and test it raises error
+        executor.shutdown()
+        
+        with pytest.raises(RuntimeError, match="Executor has been shutdown"):
+            executor.submit(lambda x: x, 1)
+        
+        with pytest.raises(RuntimeError, match="Executor has been shutdown"):
+            executor.map_async(lambda x: x, [1, 2, 3])
 
     def test_async_executor_error_handling(self):
         """Test AsyncExecutor error handling."""
