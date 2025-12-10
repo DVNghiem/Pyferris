@@ -28,6 +28,7 @@ uuid = { version = "1.18.1", features = ["v4"] }
 ahash = "0.8"  # Faster hasher
 smallvec = "1.13"  # Stack-allocated vectors for small collections
 slab = "0.4.11" # force to upgrade for fix security
+rand = "0.9.2"
 
 [target.'cfg(not(any(target_env = "musl", target_os = "freebsd", target_os = "openbsd", target_os = "windows")))'.dependencies]
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["disable_initial_exec_tls"] }

@@ -28,6 +28,7 @@ mod pipeline;
 mod scheduler;
 mod shared_memory;
 mod utils;
+mod lodash;
 
 use async_ops::*;
 use cache::*;
@@ -42,6 +43,7 @@ use pipeline::*;
 use scheduler::*;
 use shared_memory::*;
 use utils::*;
+use lodash::*;
 
 /// Pyferris Rust Extensions
 /// High-performance Rust implementations
@@ -64,7 +66,33 @@ fn _pyferris(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Config>()?;
 
     // Register simple IO functions
+    // Register simple IO functions
     register_io(py, m)?;
+
+    // Register Lodash modules
+    let array_mod = PyModule::new(py, "array")?;
+    lodash::array::array(py, &array_mod)?;
+    m.add_submodule(&array_mod)?;
+
+    let collection_mod = PyModule::new(py, "collection")?;
+    lodash::collection::collection(py, &collection_mod)?;
+    m.add_submodule(&collection_mod)?;
+
+    let function_mod = PyModule::new(py, "function")?;
+    lodash::function::function(py, &function_mod)?;
+    m.add_submodule(&function_mod)?;
+
+    let lang_mod = PyModule::new(py, "lang")?;
+    lodash::lang::lang(py, &lang_mod)?;
+    m.add_submodule(&lang_mod)?;
+
+    let object_mod = PyModule::new(py, "object")?;
+    lodash::object::object(py, &object_mod)?;
+    m.add_submodule(&object_mod)?;
+
+    let string_mod = PyModule::new(py, "string")?;
+    lodash::string::string(py, &string_mod)?;
+    m.add_submodule(&string_mod)?;
 
     // Register advanced parallel operations
     m.add_function(wrap_pyfunction!(parallel_sort, m)?)?;
